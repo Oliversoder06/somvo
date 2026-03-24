@@ -185,11 +185,11 @@ Every edit follows this loop — this never changes across versions:
 
 ### 10. Dashboard
 
-- [ ] Project list view — all user projects with status badges
-- [ ] Create new project button
-- [ ] Project card shows: thumbnail, filename, status, created date
-- [ ] Delete project (soft delete — mark as deleted, do not purge storage immediately)
-- [ ] Account settings page — name, email, plan info
+- [x] Project list view — all user projects with status badges
+- [x] Create new project button
+- [x] Project card shows: thumbnail, filename, status, created date
+- [x] Delete project (soft delete — mark as deleted, do not purge storage immediately)
+- [x] Account settings page — name, email, plan info
 - [ ] Link to billing portal (Stripe Customer Portal)
 
 ---
@@ -208,11 +208,11 @@ Every edit follows this loop — this never changes across versions:
 ### 12. Polish & Pre-launch
 
 - [ ] Responsive layout — usable on tablet and desktop (mobile is stretch goal)
-- [ ] Loading states on all async actions
+- [x] Loading states on all async actions
 - [x] Empty states for new users (onboarding prompt)
 - [ ] Basic onboarding tooltip flow (first upload walkthrough)
 - [ ] Privacy policy and terms of service pages
-- [ ] Favicon, og:image, basic SEO meta tags
+- [x] Favicon, og:image, basic SEO meta tags
 - [ ] Environment variable audit — no secrets in client bundle
 - [ ] End-to-end test: upload → process → approve → execute → export
 

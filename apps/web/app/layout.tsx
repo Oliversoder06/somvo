@@ -19,8 +19,25 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Somvo",
-  description: "AI-powered video editing with visible agent reasoning",
+  title: {
+    default: "Somvo — AI Video Editor",
+    template: "%s | Somvo",
+  },
+  description:
+    "AI-powered video editing with visible agent reasoning, per-edit approval, and one-click export.",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  ),
+  openGraph: {
+    title: "Somvo — AI Video Editor",
+    description:
+      "AI-powered video editing with visible agent reasoning, per-edit approval, and one-click export.",
+    siteName: "Somvo",
+    type: "website",
+  },
+  icons: {
+    icon: "/logo/somvo-logo.svg",
+  },
 };
 
 export default function RootLayout({

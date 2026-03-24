@@ -1,4 +1,5 @@
-import { Film } from "lucide-react";
+import { Film, Plus } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { UploadZone } from "@/components/upload-zone";
 
@@ -35,12 +36,21 @@ export default async function ProjectsPage() {
         <h1 className="font-display text-[2rem] font-extrabold leading-[1.2] tracking-[-0.02em]">
           Projects
         </h1>
+        {hasProjects && (
+          <Link
+            href="/projects/new"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent text-[#0a0a0b] font-display text-[13px] font-semibold uppercase tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all"
+          >
+            <Plus size={16} strokeWidth={2} />
+            New Project
+          </Link>
+        )}
       </div>
 
       {hasProjects ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {projects.map((project) => (
-            <a
+            <Link
               key={project.id}
               href={`/projects/${project.id}`}
               className="card card-hover block"
@@ -68,7 +78,7 @@ export default async function ProjectsPage() {
                   {formatDate(project.created_at)}
                 </span>
               </div>
-            </a>
+            </Link>
           ))}
         </div>
       ) : (
