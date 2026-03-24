@@ -73,11 +73,11 @@ Every edit follows this loop — this never changes across versions:
 
 ### 1. Project & Auth Setup
 
-- [ ] Initialise Next.js project with TypeScript and Tailwind
-- [ ] Set up Supabase project (Postgres + Storage buckets)
-- [ ] Implement Supabase Auth (email + OAuth)
-- [ ] Create `users` table with plan field (`free` | `creator` | `pro`)
-- [ ] Protect routes — redirect unauthenticated users to login
+- [x] Initialise Next.js project with TypeScript and Tailwind
+- [x] Set up Supabase project (Postgres + Storage buckets)
+- [x] Implement Supabase Auth (email + OAuth)
+- [x] Create `users` table with plan field (`free` | `creator` | `pro`)
+- [x] Protect routes — redirect unauthenticated users to login
 - [ ] Set up FastAPI project structure
 - [ ] Connect FastAPI to Supabase via service role key
 - [ ] Set up Modal.com account and link to FastAPI
@@ -86,7 +86,7 @@ Every edit follows this loop — this never changes across versions:
 
 ### 2. Video Upload
 
-- [ ] Build upload UI — drag and drop + file picker
+- [x] Build upload UI — drag and drop + file picker
 - [ ] Validate file type (mp4, mov, webm) and size limit on client
 - [ ] Upload raw video to Supabase Storage (`raw/` bucket)
 - [ ] Generate a unique `project_id` per upload
@@ -209,7 +209,7 @@ Every edit follows this loop — this never changes across versions:
 
 - [ ] Responsive layout — usable on tablet and desktop (mobile is stretch goal)
 - [ ] Loading states on all async actions
-- [ ] Empty states for new users (onboarding prompt)
+- [x] Empty states for new users (onboarding prompt)
 - [ ] Basic onboarding tooltip flow (first upload walkthrough)
 - [ ] Privacy policy and terms of service pages
 - [ ] Favicon, og:image, basic SEO meta tags
