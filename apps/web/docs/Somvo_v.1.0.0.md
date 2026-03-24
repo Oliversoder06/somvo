@@ -87,11 +87,11 @@ Every edit follows this loop — this never changes across versions:
 ### 2. Video Upload
 
 - [x] Build upload UI — drag and drop + file picker
-- [ ] Validate file type (mp4, mov, webm) and size limit on client
-- [ ] Upload raw video to Supabase Storage (`raw/` bucket)
-- [ ] Generate a unique `project_id` per upload
-- [ ] Store project metadata in `projects` table (user_id, filename, status, created_at)
-- [ ] Show upload progress indicator
+- [x] Validate file type (mp4, mov, webm) and size limit on client
+- [x] Upload raw video to Supabase Storage (`raw/` bucket)
+- [x] Generate a unique `project_id` per upload
+- [x] Store project metadata in `projects` table (user_id, filename, status, created_at)
+- [x] Show upload progress indicator
 - [ ] On upload complete, trigger backend processing job
 
 ---
