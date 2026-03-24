@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens ──────────────────────────────────────── */
+
+:root {
+  /* Backgrounds */
+  --bg-base: #0a0a0b;
+  --bg-surface: #111113;
+  --bg-elevated: #1a1a1e;
+  --bg-border: #242428;
+
+  /* Accent — Amber */
+  --accent: #f5a623;
+  --accent-dim: #f5a62314;
+  --accent-hover: #e8961a;
+
+  /* Text */
+  --text-primary: #f0ede8;
+  --text-secondary: #8b8886;
+  --text-muted: #4a4846;
+
+  /* Semantic */
+  --success: #3ecf8e;
+  --danger: #e5484d;
+  --info: #60a5fa;
+
+  /* Timeline */
+  --timeline-raw: #2a2a30;
+  --timeline-edit: #1e1e24;
+  --timeline-cut: #e5484d33;
+  --timeline-cap: #f5a62366;
+  --waveform: #3a3a42;
+  --waveform-act: #f5a623;
+
+  /* Transitions */
+  --transition-fast: 80ms ease;
+  --transition-base: 150ms ease;
+  --transition-slow: 250ms ease;
+}
+
+/* ─── Tailwind Theme ─────────────────────────────────────── */
+
+@theme inline {
+  --color-base: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-border: var(--bg-border);
+
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-accent-hover: var(--accent-hover);
+
+  --color-fg: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-muted);
+
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  --font-display: var(--font-syne);
+  --font-body: var(--font-inter);
+  --font-mono: var(--font-ibm-plex-mono);
+}
+
+/* ─── Base Styles ────────────────────────────────────────── */
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-inter);
+  font-size: 0.9375rem; /* 15px */
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Animations ─────────────────────────────────────────── */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fade-up {
+  animation: fadeUp 200ms ease forwards;
+}
+
+.animate-spin {
+  animation: spin 700ms linear infinite;
+}
