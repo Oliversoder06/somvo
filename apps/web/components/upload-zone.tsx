@@ -1,10 +1,129 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Upload } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { Upload, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
+const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
+
+type UploadState =
+  | { phase: "idle" }
+  | { phase: "uploading"; filename: string; progress: number }
+  | { phase: "processing"; filename: string; projectId: string }
+  | { phase: "error"; message: string };
+
+function extFromMime(mime: string) {
+  if (mime === "video/quicktime") return "mov";
+  if (mime === "video/webm") return "webm";
+  return "mp4";
+}
 
 export function UploadZone() {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [state, setState] = useState<UploadState>({ phase: "idle" });
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const uploadFile = useCallback(async (file: File) => {
+    // --- validate ---------------------------------------------------------
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setState({
+        phase: "error",
+        message: "Unsupported file type. Use MP4, MOV, or WebM.",
+      });
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setState({
+        phase: "error",
+        message: "File too large. Maximum size is 500 MB.",
+      });
+      return;
+    }
+
+    const supabase = createClient();
+
+    // get current user
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
+    if (authErr || !user) {
+      setState({ phase: "error", message: "You must be signed in to upload." });
+      return;
+    }
+
+    // --- step 3: create project row (status = uploading) ------------------
+    const { data: project, error: insertErr } = await supabase
+      .from("projects")
+      .insert({
+        user_id: user.id,
+        filename: file.name,
+        status: "uploading" as const,
+      })
+      .select("id")
+      .single();
+
+    if (insertErr || !project) {
+      setState({
+        phase: "error",
+        message: insertErr?.message ?? "Failed to create project.",
+      });
+      return;
+    }
+
+    const ext = extFromMime(file.type);
+    const storagePath = `${user.id}/${project.id}/original.${ext}`;
+
+    setState({ phase: "uploading", filename: file.name, progress: 0 });
+
+    // --- step 2: upload file to Supabase Storage (raw bucket) -------------
+    // Note: supabase-js doesn't expose XHR progress, so we show an
+    // indeterminate bar and flip to 100 when done.
+    const { error: uploadErr } = await supabase.storage
+      .from("raw")
+      .upload(storagePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+
+    if (uploadErr) {
+      // clean up the project row on upload failure
+      await supabase.from("projects").delete().eq("id", project.id);
+      setState({ phase: "error", message: uploadErr.message });
+      return;
+    }
+
+    setState({ phase: "uploading", filename: file.name, progress: 100 });
+
+    // --- step 4: update project row → processing --------------------------
+    const { error: updateErr } = await supabase
+      .from("projects")
+      .update({ raw_url: storagePath, status: "processing" as const })
+      .eq("id", project.id);
+
+    if (updateErr) {
+      setState({ phase: "error", message: updateErr.message });
+      return;
+    }
+
+    setState({
+      phase: "processing",
+      filename: file.name,
+      projectId: project.id,
+    });
+  }, []);
+
+  // --- drag & drop / click handlers --------------------------------------
+
+  const handleFile = useCallback(
+    (file: File | undefined) => {
+      if (!file || state.phase === "uploading") return;
+      uploadFile(file);
+    },
+    [uploadFile, state.phase],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -16,11 +135,91 @@ export function UploadZone() {
     setIsDragOver(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    // TODO: Handle file upload
-  }, []);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      handleFile(e.dataTransfer.files[0]);
+    },
+    [handleFile],
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      handleFile(e.target.files?.[0]);
+      // reset so the same file can be re-selected
+      if (inputRef.current) inputRef.current.value = "";
+    },
+    [handleFile],
+  );
+
+  // --- render ------------------------------------------------------------
+
+  if (state.phase === "uploading") {
+    return (
+      <div className="rounded-xl border-[1.5px] border-border py-16 px-8 text-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2
+            size={32}
+            strokeWidth={1.5}
+            className="text-accent animate-spin"
+          />
+          <span className="font-display text-fg font-semibold">
+            Uploading {state.filename}…
+          </span>
+          <div className="w-48 h-1.5 rounded-full bg-border overflow-hidden">
+            <div
+              className="h-full bg-accent rounded-full transition-all duration-300"
+              style={{ width: state.progress === 0 ? "60%" : "100%" }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.phase === "processing") {
+    return (
+      <div className="rounded-xl border-[1.5px] border-border py-16 px-8 text-center">
+        <div className="flex flex-col items-center gap-3">
+          <CheckCircle2
+            size={32}
+            strokeWidth={1.5}
+            className="text-green-500"
+          />
+          <span className="font-display text-fg font-semibold">
+            Upload complete
+          </span>
+          <span className="text-fg-secondary text-[13px]">
+            {state.filename} is now processing…
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.phase === "error") {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setState({ phase: "idle" })}
+        onKeyDown={(e) => e.key === "Enter" && setState({ phase: "idle" })}
+        className="rounded-xl border-[1.5px] border-red-400/40 bg-red-500/5 py-16 px-8 text-center cursor-pointer"
+      >
+        <div className="flex flex-col items-center gap-3">
+          <AlertCircle size={32} strokeWidth={1.5} className="text-red-400" />
+          <span className="font-display text-fg font-semibold">
+            Upload failed
+          </span>
+          <span className="text-fg-secondary text-[13px]">{state.message}</span>
+          <span className="text-accent text-[13px] font-medium mt-1">
+            Click to try again
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <label
@@ -38,9 +237,11 @@ export function UploadZone() {
       `}
     >
       <input
+        ref={inputRef}
         type="file"
         accept="video/mp4,video/quicktime,video/webm"
         className="hidden"
+        onChange={handleChange}
       />
       <div className="flex flex-col items-center gap-3">
         <Upload size={32} strokeWidth={1.5} className="text-fg-muted" />

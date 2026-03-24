@@ -74,6 +74,16 @@ create policy "Users can read own transcripts"
     )
   );
 
+create policy "Service can insert transcripts"
+  on public.transcripts for insert
+  with check (
+    exists (
+      select 1 from public.projects
+      where projects.id = transcripts.project_id
+        and projects.user_id = auth.uid()
+    )
+  );
+
 -- 4. Edit steps table
 create table if not exists public.edit_steps (
   id uuid primary key default gen_random_uuid(),
@@ -98,6 +108,16 @@ create policy "Users can read own edit_steps"
 create policy "Users can update own edit_steps"
   on public.edit_steps for update
   using (
+    exists (
+      select 1 from public.projects
+      where projects.id = edit_steps.project_id
+        and projects.user_id = auth.uid()
+    )
+  );
+
+create policy "Service can insert edit_steps"
+  on public.edit_steps for insert
+  with check (
     exists (
       select 1 from public.projects
       where projects.id = edit_steps.project_id
