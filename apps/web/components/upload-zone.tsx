@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Upload, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Upload, Loader2, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { extractThumbnail } from "@/lib/ffmpeg/thumbnail";
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
 const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
@@ -23,97 +25,129 @@ export function UploadZone() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [state, setState] = useState<UploadState>({ phase: "idle" });
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
-  const uploadFile = useCallback(async (file: File) => {
-    // --- validate ---------------------------------------------------------
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setState({
-        phase: "error",
-        message: "Unsupported file type. Use MP4, MOV, or WebM.",
-      });
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      setState({
-        phase: "error",
-        message: "File too large. Maximum size is 500 MB.",
-      });
-      return;
-    }
+  const uploadFile = useCallback(
+    async (file: File) => {
+      // --- validate ---------------------------------------------------------
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        setState({
+          phase: "error",
+          message: "Unsupported file type. Use MP4, MOV, or WebM.",
+        });
+        return;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        setState({
+          phase: "error",
+          message: "File too large. Maximum size is 500 MB.",
+        });
+        return;
+      }
 
-    const supabase = createClient();
+      const supabase = createClient();
 
-    // get current user
-    const {
-      data: { user },
-      error: authErr,
-    } = await supabase.auth.getUser();
-    if (authErr || !user) {
-      setState({ phase: "error", message: "You must be signed in to upload." });
-      return;
-    }
+      // get current user
+      const {
+        data: { user },
+        error: authErr,
+      } = await supabase.auth.getUser();
+      if (authErr || !user) {
+        setState({
+          phase: "error",
+          message: "You must be signed in to upload.",
+        });
+        return;
+      }
 
-    // --- step 3: create project row (status = uploading) ------------------
-    const { data: project, error: insertErr } = await supabase
-      .from("projects")
-      .insert({
-        user_id: user.id,
-        filename: file.name,
-        status: "uploading" as const,
-      })
-      .select("id")
-      .single();
+      // --- step 3: create project row (status = uploading) ------------------
+      const { data: project, error: insertErr } = await supabase
+        .from("projects")
+        .insert({
+          user_id: user.id,
+          filename: file.name,
+          status: "uploading" as const,
+        })
+        .select("id")
+        .single();
 
-    if (insertErr || !project) {
-      setState({
-        phase: "error",
-        message: insertErr?.message ?? "Failed to create project.",
-      });
-      return;
-    }
+      if (insertErr || !project) {
+        setState({
+          phase: "error",
+          message: insertErr?.message ?? "Failed to create project.",
+        });
+        return;
+      }
 
-    const ext = extFromMime(file.type);
-    const storagePath = `${user.id}/${project.id}/original.${ext}`;
+      const ext = extFromMime(file.type);
+      const storagePath = `${user.id}/${project.id}/original.${ext}`;
 
-    setState({ phase: "uploading", filename: file.name, progress: 0 });
+      setState({ phase: "uploading", filename: file.name, progress: 0 });
 
-    // --- step 2: upload file to Supabase Storage (raw bucket) -------------
-    // Note: supabase-js doesn't expose XHR progress, so we show an
-    // indeterminate bar and flip to 100 when done.
-    const { error: uploadErr } = await supabase.storage
-      .from("raw")
-      .upload(storagePath, file, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: file.type,
-      });
+      // --- step 2: upload file to Supabase Storage (raw bucket) -------------
+      // Note: supabase-js doesn't expose XHR progress, so we show an
+      // indeterminate bar and flip to 100 when done.
+      const { error: uploadErr } = await supabase.storage
+        .from("raw")
+        .upload(storagePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+        });
 
-    if (uploadErr) {
-      // clean up the project row on upload failure
-      await supabase.from("projects").delete().eq("id", project.id);
-      setState({ phase: "error", message: uploadErr.message });
-      return;
-    }
+      if (uploadErr) {
+        // clean up the project row on upload failure
+        await supabase.from("projects").delete().eq("id", project.id);
+        setState({ phase: "error", message: uploadErr.message });
+        return;
+      }
 
-    setState({ phase: "uploading", filename: file.name, progress: 100 });
+      setState({ phase: "uploading", filename: file.name, progress: 100 });
 
-    // --- step 4: update project row → processing --------------------------
-    const { error: updateErr } = await supabase
-      .from("projects")
-      .update({ raw_url: storagePath, status: "processing" as const })
-      .eq("id", project.id);
+      // --- step 4: update project row → processing --------------------------
+      const { error: updateErr } = await supabase
+        .from("projects")
+        .update({ raw_url: storagePath, status: "processing" as const })
+        .eq("id", project.id);
 
-    if (updateErr) {
-      setState({ phase: "error", message: updateErr.message });
-      return;
-    }
+      if (updateErr) {
+        setState({ phase: "error", message: updateErr.message });
+        return;
+      }
 
-    setState({
-      phase: "processing",
-      filename: file.name,
-      projectId: project.id,
-    });
-  }, []);
+      // Extract thumbnail and duration via ffmpeg.wasm
+      try {
+        const { thumbnailUrl, durationSeconds } = await extractThumbnail(file);
+
+        // Upload thumbnail to Supabase Storage
+        if (thumbnailUrl) {
+          const thumbResp = await fetch(thumbnailUrl);
+          const thumbBlob = await thumbResp.blob();
+          await supabase.storage
+            .from("raw")
+            .upload(`${user.id}/${project.id}/thumbnail.jpg`, thumbBlob, {
+              contentType: "image/jpeg",
+              upsert: true,
+            });
+          URL.revokeObjectURL(thumbnailUrl);
+        }
+
+        // Save duration to projects table
+        if (durationSeconds > 0) {
+          await supabase
+            .from("projects")
+            .update({ duration_seconds: Math.round(durationSeconds) })
+            .eq("id", project.id);
+        }
+      } catch {
+        // Thumbnail extraction is non-critical — continue to editor
+      }
+
+      // Navigate directly to the editor
+      router.push(`/projects/${project.id}`);
+    },
+    [router],
+  );
 
   // --- drag & drop / click handlers --------------------------------------
 
@@ -173,26 +207,6 @@ export function UploadZone() {
               style={{ width: state.progress === 0 ? "60%" : "100%" }}
             />
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (state.phase === "processing") {
-    return (
-      <div className="rounded-xl border-[1.5px] border-border py-16 px-8 text-center">
-        <div className="flex flex-col items-center gap-3">
-          <CheckCircle2
-            size={32}
-            strokeWidth={1.5}
-            className="text-green-500"
-          />
-          <span className="font-display text-fg font-semibold">
-            Upload complete
-          </span>
-          <span className="text-fg-secondary text-[13px]">
-            {state.filename} is now processing…
-          </span>
         </div>
       </div>
     );

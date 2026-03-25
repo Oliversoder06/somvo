@@ -1,9 +1,8 @@
-import { Topbar } from "@/components/topbar";
-import { Sidebar } from "@/components/sidebar";
 import { Providers } from "@/components/providers";
 import { createClient } from "@/lib/supabase/server";
+import { EditorShell } from "@/components/editor/editor-shell";
 
-export default async function DashboardLayout({
+export default async function EditorRouteLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -13,7 +12,6 @@ export default async function DashboardLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch user profile for plan badge
   let plan: string = "free";
   if (user) {
     const { data } = await supabase
@@ -26,13 +24,9 @@ export default async function DashboardLayout({
 
   return (
     <Providers>
-      <Topbar email={user?.email ?? null} plan={plan} />
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto" id="main-content">
-          <div className="mx-auto max-w-300 p-8">{children}</div>
-        </main>
-      </div>
+      <EditorShell email={user?.email ?? null} plan={plan}>
+        {children}
+      </EditorShell>
     </Providers>
   );
 }
