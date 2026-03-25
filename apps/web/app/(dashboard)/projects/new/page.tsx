@@ -12,7 +12,7 @@ export default function NewProjectPage() {
         >
           <ArrowLeft size={16} strokeWidth={1.5} />
         </Link>
-        <h1 className="font-display text-[1.5rem] font-bold leading-[1.2] tracking-[-0.02em]">
+        <h1 className="font-display text-[1.625rem] font-semibold leading-[1.2] tracking-[-0.03em]">
           New Project
         </h1>
       </div>

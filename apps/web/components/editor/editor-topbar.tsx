@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Keyboard } from "lucide-react";
@@ -29,7 +28,7 @@ export function EditorTopbar({
   const initial = email ? email[0].toUpperCase() : "U";
 
   const statusLabel: Record<string, { text: string; className: string }> = {
-    uploading: { text: "Uploading", className: "text-accent" },
+    uploading: { text: "Uploading", className: "text-fg-muted" },
     processing: { text: "Processing", className: "text-info" },
     ready: { text: "Ready", className: "text-success" },
     done: { text: "Done", className: "text-success" },
@@ -39,7 +38,7 @@ export function EditorTopbar({
   const s = statusLabel[status] ?? statusLabel.uploading;
 
   return (
-    <header className="h-11 shrink-0 flex items-center justify-between px-3 bg-surface border-b border-border">
+    <header className="h-11 shrink-0 flex items-center justify-between px-3">
       {/* Left: back + logo + project name */}
       <div className="flex items-center gap-2 min-w-0">
         <Link
@@ -49,16 +48,6 @@ export function EditorTopbar({
         >
           <ArrowLeft size={14} strokeWidth={1.5} />
         </Link>
-
-        <div className="w-px h-4 bg-border" />
-
-        <Image
-          src="/logo/somvo-logo.svg"
-          alt="Somvo"
-          width={72}
-          height={16}
-          priority
-        />
 
         {projectName && (
           <>

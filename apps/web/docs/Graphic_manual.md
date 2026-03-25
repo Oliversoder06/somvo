@@ -8,7 +8,7 @@
 
 Somvo sits in the moment between raw footage and finished video — the shadow before the reveal. The visual language reflects this: dark, precise, controlled tension. It is not a playful consumer app. It is not a clinical SaaS dashboard. It is a **focused creative tool** that feels like it was built for people who take their content seriously.
 
-The aesthetic is **dark editorial** — the look of a high-end post-production suite crossed with a well-designed developer tool. Think Vercel's dashboard meets a film editing terminal. Dense with information but never chaotic. Every pixel is intentional.
+The aesthetic is **dark cinematic SaaS** — the look of a high-end post-production suite crossed with a well-designed developer tool. Think Cardboard's cinematic depth meets a film editing terminal. Floating UI elements with layered depth through shadow and contrast, never glassmorphism. Dense with information but never chaotic. Every pixel is intentional.
 
 ---
 
@@ -19,41 +19,41 @@ All colours are defined as CSS custom properties on `:root`. Never hardcode hex 
 ```css
 :root {
   /* Backgrounds */
-  --bg-base: #0a0a0b; /* Page background — near black */
-  --bg-surface: #111113; /* Cards, panels, modals */
-  --bg-elevated: #1a1a1e; /* Hover states, nested panels */
-  --bg-border: #242428; /* Dividers, borders */
+  --bg-base: #080809; /* Page background — deeper near-black, slightly cool */
+  --bg-surface: #0e0e10; /* Cards, panels */
+  --bg-elevated: #161618; /* Hover states, nested panels */
+  --bg-border: #1f1f23; /* Dividers, borders — more subtle */
 
-  /* Primary — Amber */
-  --accent: #f5a623; /* Primary CTA, highlights, active states */
-  --accent-dim: #f5a62322; /* Accent background wash */
-  --accent-hover: #e8961a; /* Darker accent on hover */
+  /* Primary accent — Ice Blue */
+  --accent: #e2e8f0; /* Near-white, clean, premium */
+  --accent-dim: #e2e8f010; /* Accent background wash */
+  --accent-hover: #cbd5e1; /* Slightly dimmer on hover */
 
   /* Text */
-  --text-primary: #f0ede8; /* Headings, labels */
-  --text-secondary: #8b8886; /* Subtext, descriptions */
-  --text-muted: #4a4846; /* Placeholders, disabled */
+  --text-primary: #f8f8f8; /* Headings — brighter, no warmth */
+  --text-secondary: #71717a; /* Subtext, descriptions */
+  --text-muted: #3f3f46; /* Placeholders, disabled */
 
   /* Semantic */
   --success: #3ecf8e; /* Approved steps, export complete */
-  --warning: #f5a623; /* Shared with accent */
   --danger: #e5484d; /* Rejected steps, errors */
   --info: #60a5fa; /* Processing states, info badges */
 
   /* Timeline specific */
-  --timeline-raw: #2a2a30; /* Raw track background */
-  --timeline-edit: #1e1e24; /* Edit track background */
+  --timeline-raw: #18181b; /* Raw track background */
+  --timeline-edit: #141416; /* Edit track background */
   --timeline-cut: #e5484d33; /* Cut region overlay */
-  --timeline-cap: #f5a62366; /* Caption marker */
-  --waveform: #3a3a42; /* Inactive waveform */
-  --waveform-act: #f5a623; /* Active/playhead waveform */
+  --timeline-cap: #e2e8f033; /* Caption marker */
+  --waveform: #27272a; /* Inactive waveform */
+  --waveform-act: #e2e8f0; /* Active/playhead waveform */
 }
 ```
 
 **Rules:**
 
 - Background hierarchy: `--bg-base` → `--bg-surface` → `--bg-elevated`. Never invert this.
-- `--accent` is reserved for one primary action per view. Do not use it decoratively.
+- Accent is near-white, signalling clarity and precision. It is reserved for one primary action per view only.
+- No warm tones anywhere. The palette is cool-neutral.
 - No pure white (`#ffffff`) anywhere. Use `--text-primary` for the brightest text.
 - Transparency is preferred over new colours. Use `--accent` at reduced opacity before inventing a new colour.
 
@@ -61,34 +61,46 @@ All colours are defined as CSS custom properties on `:root`. Never hardcode hex 
 
 ## 3. Typography
 
-```css
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@500;600;700;800&family=Inter:wght@400;500&display=swap");
+Fonts are loaded via `next/font/google` in `app/layout.tsx`. The CSS variables are set automatically by Next.js.
 
+```tsx
+import { Geist, Geist_Mono } from "next/font/google";
+
+const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+```
+
+```css
 :root {
-  --font-display: "Syne", sans-serif; /* Headings, labels, nav */
-  --font-body: "Inter", sans-serif; /* Body copy, descriptions */
-  --font-mono:
-    "IBM Plex Mono", monospace; /* Timestamps, code, agent reasoning */
+  --font-display: "Geist", sans-serif; /* Headings, labels, nav */
+  --font-body: "Geist", sans-serif; /* Body copy, descriptions */
+  --font-mono: "Geist Mono", monospace; /* Timestamps, code, agent reasoning */
 }
 ```
 
 ### Type Scale
 
-| Token         | Font          | Size             | Weight  | Use                            |
-| ------------- | ------------- | ---------------- | ------- | ------------------------------ |
-| `--text-2xl`  | Syne          | 2rem / 32px      | 800     | Page titles                    |
-| `--text-xl`   | Syne          | 1.5rem / 24px    | 700     | Section headings               |
-| `--text-lg`   | Syne          | 1.125rem / 18px  | 600     | Card titles, panel headers     |
-| `--text-base` | Inter         | 0.9375rem / 15px | 400     | Body copy                      |
-| `--text-sm`   | Inter         | 0.8125rem / 13px | 400     | Labels, secondary text         |
-| `--text-xs`   | IBM Plex Mono | 0.75rem / 12px   | 400/500 | Timestamps, metadata, step IDs |
+| Token         | Font       | Size             | Weight  | Use                            |
+| ------------- | ---------- | ---------------- | ------- | ------------------------------ |
+| `--text-2xl`  | Geist      | 2.25rem / 36px   | 700     | Page titles                    |
+| `--text-xl`   | Geist      | 1.625rem / 26px  | 600     | Section headings               |
+| `--text-lg`   | Geist      | 1.125rem / 18px  | 500     | Card titles, panel headers     |
+| `--text-base` | Geist      | 0.9375rem / 15px | 400     | Body copy                      |
+| `--text-sm`   | Geist      | 0.8125rem / 13px | 400     | Labels, secondary text         |
+| `--text-xs`   | Geist Mono | 0.75rem / 12px   | 400/500 | Timestamps, metadata, step IDs |
 
 **Rules:**
 
+- Both display and body use Geist — unified, clean, modern.
+- Geist Mono replaces IBM Plex Mono for timestamps and metadata.
 - Use `--font-display` for anything the user reads as a label or heading.
 - Use `--font-mono` for any time-related value, step index, file size, or agent output. This signals machine precision.
 - Line-height: `1.5` for body, `1.2` for headings, `1.6` for agent reasoning text.
-- Letter-spacing: `-0.02em` on display headings size `--text-xl` and above.
+- Letter-spacing: `-0.03em` on display headings size `--text-xl` and above.
+- No `text-transform: uppercase` on display headings. Badges and step type labels remain uppercase.
 
 ---
 
@@ -171,20 +183,20 @@ Based on a 4px base unit.
 ```css
 /* Primary */
 .btn-primary {
-  background: var(--accent);
-  color: #0a0a0b;
+  background: var(--text-primary);
+  color: #080809;
   font-family: var(--font-display);
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
   padding: 10px 20px;
   border-radius: 6px;
   border: none;
   cursor: pointer;
   transition:
-    background 120ms ease,
-    transform 80ms ease;
+    background var(--transition-fast),
+    transform var(--transition-fast);
 }
 .btn-primary:hover {
   background: var(--accent-hover);
@@ -198,7 +210,10 @@ Based on a 4px base unit.
   background: transparent;
   color: var(--text-primary);
   border: 1px solid var(--bg-border);
-  /* same sizing as primary */
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 20px;
 }
 .btn-secondary:hover {
   background: var(--bg-elevated);
@@ -221,6 +236,8 @@ Based on a 4px base unit.
 **Rules:**
 
 - One `btn-primary` per page/view maximum.
+- Primary button is white on dark — high contrast, clean.
+- No `text-transform: uppercase` on buttons.
 - Buttons never have box shadows. Depth is handled by background contrast only.
 - Icon buttons (icon only, no text) are 36×36px, `border-radius: 6px`.
 
@@ -243,9 +260,12 @@ Based on a 4px base unit.
 }
 ```
 
-- No box shadows on cards. Border is the only separation.
+- No box shadows on regular cards. Border is the only separation.
 - Hover state on clickable cards: `border-color: var(--text-muted); background: var(--bg-elevated)`.
 - `border-radius: 10px` on standalone cards. `border-radius: 6px` on nested elements inside cards.
+- **Exception:** Floating product preview cards may use a subtle box-shadow for depth:
+  `box-shadow: 0 0 0 1px var(--bg-border), 0 24px 48px rgba(0,0,0,0.6);`
+  This is the only permitted use of box-shadow in the system.
 
 ---
 
@@ -278,7 +298,7 @@ Based on a 4px base unit.
   color: var(--danger);
 }
 .badge-free {
-  background: #f5a62322;
+  background: #e2e8f022;
   color: var(--accent);
 }
 .badge-creator {
@@ -310,18 +330,18 @@ The core UI unit of the product. Each proposed edit step from the agent.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  ○  01   CUT SILENCE          00:14.2 – 00:17.8          │
+│  ○  01   Cut silence           00:14.2 – 00:17.8         │
 │         Removes 3.6s of silence between sentences.       │
 │                              [ Reject ]  [ ✓ Approve ]   │
 └──────────────────────────────────────────────────────────┘
 ```
 
 - Step index: `--font-mono`, `--text-muted`
-- Step type: `--font-display`, uppercase, `--text-primary`
+- Step type: `--font-display`, `font-weight: 600`, `--text-primary` (no uppercase — prominence via weight only)
 - Timestamp range: `--font-mono`, `--text-secondary`
 - Reason text: `--font-body`, `--text-secondary`, size `--text-sm`
-- Approved state: left border `3px solid --success`, background `--success` at 4% opacity
-- Rejected state: left border `3px solid --danger`, opacity `0.4` on entire card
+- Approved state: left border `3px solid --success`, background `rgba(62,207,142,0.04)`
+- Rejected state: left border `3px solid --danger`, opacity `0.35` on entire card
 - Pending state: left border `3px solid --bg-border`
 
 ---
@@ -330,7 +350,7 @@ The core UI unit of the product. Each proposed edit step from the agent.
 
 - Background: `--timeline-raw` and `--timeline-edit` for respective tracks
 - Track label: left-aligned, `--font-mono`, 11px, `--text-muted`
-- Playhead: 1px wide, `--accent`, full track height, with a small triangle handle at top
+- Playhead: 1px wide, `--waveform-act`, full track height, with a small triangle handle at top
 - Cut regions: `--timeline-cut` overlay
 - Caption ticks: 2px wide, `--timeline-cap`, full track height
 - Waveform colour: `--waveform` inactive, `--waveform-act` for played portion
@@ -381,8 +401,8 @@ The core UI unit of the product. Each proposed edit step from the agent.
 }
 .upload-zone:hover,
 .upload-zone.drag-over {
-  border-color: var(--accent);
-  background: var(--accent-dim);
+  border-color: var(--text-muted);
+  background: var(--bg-elevated);
 }
 ```
 
@@ -465,14 +485,15 @@ import {
 ─ Settings
 ```
 
-- Active link: left border `2px solid --accent`, background `--accent-dim`, text `--text-primary`
+- Active link: left border `2px solid --text-muted`, background `--bg-elevated`, text `--text-primary`
 - Inactive link: no border, text `--text-secondary`
 - Link font: `--font-display`, 13px, `font-weight: 500`
 - Icon + label. Icon is `16px` Lucide, `stroke-width: 1.5`
+- Reserve `--accent` (near-white) as a highlight only — not for nav active states.
 
 ### Topbar
 
-- Logo: wordmark `SOMVO` in `--font-display`, `font-weight: 800`, `--text-primary`. No logomark for MVP.
+- Logo: wordmark `SOMVO` in `--font-display`, `font-weight: 700`, `--text-primary`, `letter-spacing: -0.04em`. No logomark for MVP.
 - Right side: avatar circle (initials, `--bg-elevated` background) + plan badge
 
 ---
@@ -514,7 +535,7 @@ Modern Next.js (App Router) does not use a `tailwind.config.js`. All design toke
 ```css
 /* app/globals.css */
 
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@500;600;700;800&family=Inter:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@400;500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -524,20 +545,20 @@ Modern Next.js (App Router) does not use a `tailwind.config.js`. All design toke
 
 :root {
   /* Backgrounds */
-  --bg-base: #0a0a0b;
-  --bg-surface: #111113;
-  --bg-elevated: #1a1a1e;
-  --bg-border: #242428;
+  --bg-base: #080809;
+  --bg-surface: #0e0e10;
+  --bg-elevated: #161618;
+  --bg-border: #1f1f23;
 
-  /* Accent — Amber */
-  --accent: #f5a623;
-  --accent-dim: #f5a62322;
-  --accent-hover: #e8961a;
+  /* Primary accent — Ice Blue */
+  --accent: #e2e8f0;
+  --accent-dim: #e2e8f010;
+  --accent-hover: #cbd5e1;
 
   /* Text */
-  --text-primary: #f0ede8;
-  --text-secondary: #8b8886;
-  --text-muted: #4a4846;
+  --text-primary: #f8f8f8;
+  --text-secondary: #71717a;
+  --text-muted: #3f3f46;
 
   /* Semantic */
   --success: #3ecf8e;
@@ -545,17 +566,17 @@ Modern Next.js (App Router) does not use a `tailwind.config.js`. All design toke
   --info: #60a5fa;
 
   /* Timeline */
-  --timeline-raw: #2a2a30;
-  --timeline-edit: #1e1e24;
+  --timeline-raw: #18181b;
+  --timeline-edit: #141416;
   --timeline-cut: #e5484d33;
-  --timeline-cap: #f5a62366;
-  --waveform: #3a3a42;
-  --waveform-act: #f5a623;
+  --timeline-cap: #e2e8f033;
+  --waveform: #27272a;
+  --waveform-act: #e2e8f0;
 
   /* Typography */
-  --font-display: "Syne", sans-serif;
-  --font-body: "Inter", sans-serif;
-  --font-mono: "IBM Plex Mono", monospace;
+  --font-display: "Geist", sans-serif;
+  --font-body: "Geist", sans-serif;
+  --font-mono: "Geist Mono", monospace;
 
   /* Spacing */
   --space-1: 4px;
@@ -613,14 +634,16 @@ body {
     transform: rotate(360deg);
   }
 }
+```
 
 .fade-up {
-  animation: fadeUp 200ms ease forwards;
+animation: fadeUp 200ms ease forwards;
 }
 
 .animate-spin {
-  animation: spin 700ms linear infinite;
+animation: spin 700ms linear infinite;
 }
+
 ```
 
 **Rules:**
@@ -628,19 +651,25 @@ body {
 - All CSS variables are defined here and nowhere else.
 - Tailwind utility classes are used for layout and spacing where convenient, but always reference `var(--token)` for colours and fonts — never raw hex values in component files.
 - Do not add a `tailwind.config.js` or `tailwind.config.ts`. Tailwind v4 (used in current Next.js) is configured via CSS only.
+- Fonts are loaded via `next/font/google` in `app/layout.tsx` using Geist and Geist Mono.
 
 ---
 
 ## 13. Do / Don't
 
-| ✅ Do                                             | ❌ Don't                                           |
-| ------------------------------------------------- | -------------------------------------------------- |
-| Use `--font-mono` for all timestamps and metadata | Use Inter or system fonts for any heading          |
-| Keep `--accent` for one primary action per view   | Use amber decoratively or on multiple elements     |
-| Use borders for depth and separation              | Use box shadows anywhere                           |
-| Label step types in uppercase monospace           | Use sentence case for agent step labels            |
-| Keep backgrounds in the `--bg-*` hierarchy        | Introduce new background colours                   |
-| Animate step list entrance with `fadeUp` stagger  | Add bounce, spring, or scroll-triggered animations |
-| Use Lucide icons at `stroke-width: 1.5`           | Mix icon libraries or use filled icons             |
-| One primary CTA per view                          | Stack multiple `btn-primary` buttons together      |
-| Static labels above inputs                        | Float or animate labels inside inputs              |
+| ✅ Do                                                  | ❌ Don't                                                |
+| ------------------------------------------------------ | ------------------------------------------------------- |
+| Use Geist and Geist Mono exclusively                   | Use Syne, Inter, IBM Plex Mono, or any other fonts      |
+| Keep backgrounds in the `--bg-*` hierarchy (cool-neutral) | Introduce warm tones or amber anywhere                  |
+| Use near-white primary button on dark backgrounds      | Use accent colour as a button background                |
+| Use `--font-mono` for all timestamps and metadata      | Use body font for timestamps or machine output          |
+| Keep `--accent` for one primary action per view        | Use accent decoratively or on multiple elements         |
+| Use borders for depth and separation                   | Use box shadows on regular cards or panels              |
+| Use box-shadow only on floating product preview cards  | Add box-shadow to anything else                         |
+| Label badge and step types in uppercase monospace      | Uppercase display headings or button labels             |
+| Use `--text-muted` border for active sidebar links     | Use accent colour on nav active states                  |
+| Animate step list entrance with `fadeUp` stagger       | Add bounce, spring, or scroll-triggered animations      |
+| Use Lucide icons at `stroke-width: 1.5`               | Mix icon libraries or use filled icons                  |
+| One primary CTA per view                               | Stack multiple `btn-primary` buttons together           |
+| Static labels above inputs                             | Float or animate labels inside inputs                   |
+```

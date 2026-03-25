@@ -45,7 +45,7 @@ export function StepCard({
       className={`
         border-l-[3px] rounded-r-md px-3 py-2.5 transition-all cursor-pointer
         ${isApproved ? "border-l-success bg-[var(--success)]/[0.04]" : ""}
-        ${isRejected ? "border-l-danger opacity-40" : ""}
+        ${isRejected ? "border-l-danger opacity-35" : ""}
         ${!isApproved && !isRejected ? "border-l-border" : ""}
         ${isFocused ? "bg-elevated/50" : "hover:bg-elevated/30"}
       `}
@@ -55,7 +55,7 @@ export function StepCard({
         <span className="font-mono text-[11px] text-fg-muted w-5 shrink-0">
           {String(index + 1).padStart(2, "0")}
         </span>
-        <span className="font-display text-[12px] font-semibold uppercase tracking-[0.06em] text-fg">
+        <span className="font-display text-[12px] font-semibold tracking-[0.06em] text-fg">
           {TYPE_LABELS[step.type] ?? step.type.toUpperCase()}
         </span>
         <span className="font-mono text-[10px] text-fg-muted px-1.5 py-0.5 rounded bg-elevated">

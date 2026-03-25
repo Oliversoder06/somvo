@@ -97,7 +97,7 @@ export function Timeline({
       steps.forEach((step) => {
         const color =
           step.type === "caption"
-            ? "rgba(245, 166, 35, 0.2)"
+            ? "rgba(226, 232, 240, 0.2)"
             : "rgba(229, 72, 77, 0.2)";
 
         p.segments.add({

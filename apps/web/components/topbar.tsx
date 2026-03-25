@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -22,19 +21,10 @@ export function Topbar({ email, plan }: TopbarProps) {
   const initial = email ? email[0].toUpperCase() : "U";
 
   return (
-    <header className="h-14 shrink-0 flex items-center justify-between px-6 bg-surface border-b border-border">
-      {/* Logo */}
-      <Image
-        src="/logo/somvo-logo.svg"
-        alt="Somvo"
-        width={100}
-        height={20}
-        priority
-      />
-
+    <header className="h-14 shrink-0 flex items-center justify-end px-6">
       {/* Right section */}
       <div className="flex items-center gap-3">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] px-2 py-0.5 rounded bg-[#f5a62318] text-accent">
+        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] px-2 py-0.5 rounded bg-accent-dim text-accent">
           <span className="w-1.5 h-1.5 rounded-full bg-current" />
           {plan}
         </span>

@@ -30,7 +30,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="fade-up">
-      <h1 className="font-display text-[2rem] font-extrabold leading-[1.2] tracking-[-0.02em] mb-8">
+      <h1 className="font-display text-[2.25rem] font-bold leading-[1.2] tracking-[-0.03em] mb-8">
         Settings
       </h1>
 

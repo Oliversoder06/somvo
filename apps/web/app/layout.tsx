@@ -1,21 +1,15 @@
 import type { Metadata } from "next";
-import { Syne, Inter, IBM_Plex_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const syne = Syne({
-  variable: "--font-syne",
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
 });
 
-const inter = Inter({
-  variable: "--font-inter",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-ibm-plex-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -46,10 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${syne.variable} ${inter.variable} ${ibmPlexMono.variable}`}
-    >
+    <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
       <body className="min-h-screen flex flex-col">{children}</body>
     </html>
   );

@@ -33,13 +33,13 @@ export default async function ProjectsPage() {
     <div className="fade-up">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <h1 className="font-display text-[2rem] font-extrabold leading-[1.2] tracking-[-0.02em]">
+        <h1 className="font-display text-[2.25rem] font-bold leading-[1.2] tracking-[-0.03em]">
           Projects
         </h1>
         {hasProjects && (
           <Link
             href="/projects/new"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-accent text-[#0a0a0b] font-display text-[13px] font-semibold uppercase tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-fg text-[#080809] font-display text-[13px] font-semibold tracking-[0.01em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all"
           >
             <Plus size={16} strokeWidth={2} />
             New Project

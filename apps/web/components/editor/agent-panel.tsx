@@ -174,7 +174,7 @@ export function AgentPanel() {
           <button
             onClick={handleConfirm}
             disabled={!hasApproved}
-            className="w-full py-2 bg-accent text-[#0a0a0b] font-display text-[12px] font-semibold uppercase tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="w-full py-2 bg-fg text-[#080809] font-display text-[12px] font-semibold tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             Confirm {approvedCount > 0 ? `${approvedCount} ` : ""}edits
           </button>

@@ -245,8 +245,8 @@ export function UploadZone() {
         transition-[border-color,background] duration-150
         ${
           isDragOver
-            ? "border-accent bg-[#f5a62310]"
-            : "border-border hover:border-accent hover:bg-[#f5a62310]"
+            ? "border-fg-muted bg-elevated"
+            : "border-border hover:border-fg-muted hover:bg-elevated"
         }
       `}
     >

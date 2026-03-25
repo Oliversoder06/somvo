@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, FolderOpen, BarChart3, Settings } from "lucide-react";
@@ -15,7 +16,18 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-60 shrink-0 bg-surface border-r border-border flex flex-col py-4">
+    <aside className="w-60 shrink-0 flex flex-col py-4">
+      {/* Logo */}
+      <div className="px-5 mb-6">
+        <Image
+          src="/logo/somvo-logo.svg"
+          alt="Somvo"
+          width={100}
+          height={20}
+          priority
+        />
+      </div>
+
       <nav className="flex flex-col gap-1 px-3">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
@@ -29,7 +41,7 @@ export function Sidebar() {
                 border-l-2
                 ${
                   isActive
-                    ? "border-accent bg-accent-dim text-fg"
+                    ? "border-fg-muted bg-elevated text-fg"
                     : "border-transparent text-fg-secondary hover:text-fg"
                 }
               `}

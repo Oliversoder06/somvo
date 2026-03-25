@@ -4,20 +4,20 @@
 
 :root {
   /* Backgrounds */
-  --bg-base: #0a0a0b;
-  --bg-surface: #111113;
-  --bg-elevated: #1a1a1e;
-  --bg-border: #242428;
+  --bg-base: #080809;
+  --bg-surface: #0e0e10;
+  --bg-elevated: #161618;
+  --bg-border: #1f1f23;
 
-  /* Accent — Amber */
-  --accent: #f5a623;
-  --accent-dim: #f5a62314;
-  --accent-hover: #e8961a;
+  /* Primary accent — Ice Blue */
+  --accent: #e2e8f0;
+  --accent-dim: #e2e8f010;
+  --accent-hover: #cbd5e1;
 
   /* Text */
-  --text-primary: #f0ede8;
-  --text-secondary: #8b8886;
-  --text-muted: #4a4846;
+  --text-primary: #f8f8f8;
+  --text-secondary: #71717a;
+  --text-muted: #3f3f46;
 
   /* Semantic */
   --success: #3ecf8e;
@@ -25,12 +25,12 @@
   --info: #60a5fa;
 
   /* Timeline */
-  --timeline-raw: #2a2a30;
-  --timeline-edit: #1e1e24;
+  --timeline-raw: #18181b;
+  --timeline-edit: #141416;
   --timeline-cut: #e5484d33;
-  --timeline-cap: #f5a62366;
-  --waveform: #3a3a42;
-  --waveform-act: #f5a623;
+  --timeline-cap: #e2e8f033;
+  --waveform: #27272a;
+  --waveform-act: #e2e8f0;
 
   /* Transitions */
   --transition-fast: 80ms ease;
@@ -58,9 +58,9 @@
   --color-danger: var(--danger);
   --color-info: var(--info);
 
-  --font-display: var(--font-syne);
-  --font-body: var(--font-inter);
-  --font-mono: var(--font-ibm-plex-mono);
+  --font-display: var(--font-geist);
+  --font-body: var(--font-geist);
+  --font-mono: var(--font-geist-mono);
 }
 
 /* ─── Base Styles ────────────────────────────────────────── */
@@ -68,7 +68,7 @@
 body {
   background-color: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-inter);
+  font-family: var(--font-geist);
   font-size: 0.9375rem; /* 15px */
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -127,7 +127,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: var(--font-ibm-plex-mono);
+  font-family: var(--font-geist-mono);
   font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
@@ -137,7 +137,7 @@ body {
 }
 
 .badge-uploading {
-  background: #f5a62322;
+  background: #e2e8f022;
   color: var(--accent);
 }
 
