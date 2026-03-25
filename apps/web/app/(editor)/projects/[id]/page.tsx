@@ -61,9 +61,18 @@ export default function EditorPage() {
     if (!project?.raw_url) return;
 
     async function getSignedUrl() {
-      const { data } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from("raw")
         .createSignedUrl(project!.raw_url!, 3600);
+      if (error) {
+        console.error(
+          "[Somvo] Failed to create signed URL:",
+          error.message,
+          "path:",
+          project!.raw_url,
+        );
+        return;
+      }
       if (data?.signedUrl) {
         setVideoUrl(data.signedUrl);
       }
@@ -131,7 +140,13 @@ export default function EditorPage() {
     "space",
     (e) => {
       e.preventDefault();
-      setIsPlaying(!isPlaying);
+      const el = playerRef.current;
+      if (!el) return;
+      if (isPlaying) {
+        el.pause();
+      } else {
+        el.play().catch(() => setIsPlaying(false));
+      }
     },
     { enableOnFormTags: false },
     [isPlaying],

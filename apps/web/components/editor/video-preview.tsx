@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback } from "react";
-import ReactPlayer from "react-player";
 import { Play, Pause, Loader2, Maximize2, Volume2 } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
 
@@ -27,11 +26,15 @@ export function VideoPreview({
   const setIsPlaying = useEditorStore((s) => s.setIsPlaying);
 
   const togglePlay = useCallback(() => {
-    setIsPlaying(!isPlaying);
     const el = playerRef.current;
-    if (el) {
-      if (isPlaying) el.pause();
-      else el.play();
+    if (!el) return;
+    if (isPlaying) {
+      el.pause();
+    } else {
+      el.play().catch(() => {
+        // Source not loaded or unsupported — keep paused state
+        setIsPlaying(false);
+      });
     }
   }, [isPlaying, setIsPlaying, playerRef]);
 
@@ -43,14 +46,11 @@ export function VideoPreview({
       {/* Video area */}
       <div className="flex-1 relative flex items-center justify-center overflow-hidden">
         {videoUrl && (
-          <ReactPlayer
-            ref={(el) => {
-              if (el instanceof HTMLVideoElement) {
-                playerRef.current = el;
-              }
-            }}
+          <video
+            key={videoUrl}
+            ref={playerRef}
             src={videoUrl}
-            autoPlay={isPlaying}
+            preload="auto"
             onTimeUpdate={(e) => {
               setCurrentTime(e.currentTarget.currentTime);
             }}
@@ -60,12 +60,20 @@ export function VideoPreview({
             onPause={() => setIsPlaying(false)}
             onPlay={() => setIsPlaying(true)}
             onEnded={() => setIsPlaying(false)}
-            width="100%"
-            height="100%"
+            onError={(e) => {
+              console.error(
+                "[Somvo] Video load error:",
+                e.currentTarget.error?.message,
+                "src:",
+                videoUrl,
+              );
+            }}
             style={{
               position: "absolute",
               top: 0,
               left: 0,
+              width: "100%",
+              height: "100%",
               objectFit: "contain",
             }}
           />

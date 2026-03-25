@@ -9,7 +9,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        // Only enable cross-origin isolation on pages that use ffmpeg.wasm
+        // (SharedArrayBuffer requires COOP + COEP). Applying these globally
+        // blocks cross-origin media like Supabase Storage signed URLs.
+        source: "/projects/new",
         headers: [
           {
             key: "Cross-Origin-Opener-Policy",
