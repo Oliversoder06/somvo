@@ -9,6 +9,7 @@ export function Timeline({
   playerRef: React.MutableRefObject<HTMLVideoElement | null>;
 }) {
   const steps = useEditorStore((s) => s.steps);
+  const approvedStepIds = useEditorStore((s) => s.approvedStepIds);
   const currentTime = useEditorStore((s) => s.currentTime);
   const duration = useEditorStore((s) => s.duration);
   const rawContainerRef = useRef<HTMLDivElement>(null);
@@ -89,23 +90,35 @@ export function Timeline({
           labelText: string;
         }) => void;
       };
+      points: {
+        removeAll: () => void;
+        add: (pt: { time: number; color: string; labelText: string }) => void;
+      };
     };
 
     try {
       p.segments.removeAll();
+      if (p.points) p.points.removeAll();
 
       steps.forEach((step) => {
-        const color =
-          step.type === "caption"
-            ? "rgba(226, 232, 240, 0.2)"
-            : "rgba(229, 72, 77, 0.2)";
-
-        p.segments.add({
-          startTime: step.startTime,
-          endTime: step.endTime,
-          color,
-          labelText: step.type,
-        });
+        if (step.type === "caption") {
+          // Caption markers as Peaks.js points
+          if (p.points) {
+            p.points.add({
+              time: step.startTime,
+              color: "#f5a62366",
+              labelText: "Caption",
+            });
+          }
+        } else {
+          // cut_silence / cut_filler — red wash segments
+          p.segments.add({
+            startTime: step.startTime,
+            endTime: step.endTime,
+            color: "#e5484d33",
+            labelText: step.type,
+          });
+        }
       });
     } catch {
       // Segments API may not be ready

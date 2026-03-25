@@ -115,6 +115,22 @@ export function UploadZone() {
         return;
       }
 
+      // Trigger backend processing pipeline
+      try {
+        const apiUrl =
+          process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+        await fetch(`${apiUrl}/api/process`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            project_id: project.id,
+            raw_url: storagePath,
+          }),
+        });
+      } catch {
+        // Backend trigger is non-critical — pipeline may be triggered separately
+      }
+
       // Extract thumbnail and duration via ffmpeg.wasm
       try {
         const { thumbnailUrl, durationSeconds } = await extractThumbnail(file);

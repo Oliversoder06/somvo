@@ -1,9 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { CheckCheck, XCircle, Loader2, Sparkles } from "lucide-react";
+import {
+  CheckCheck,
+  XCircle,
+  Loader2,
+  Sparkles,
+  ArrowLeft,
+  Download,
+} from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
+import { createClient } from "@/lib/supabase/client";
 import { StepCard } from "./step-card";
+import Link from "next/link";
 
 const containerVariants = {
   hidden: {},
@@ -27,6 +37,10 @@ export function AgentPanel() {
   const focusedStepIndex = useEditorStore((s) => s.focusedStepIndex);
   const setFocusedStepIndex = useEditorStore((s) => s.setFocusedStepIndex);
   const projectId = useEditorStore((s) => s.projectId);
+  const setStatus = useEditorStore((s) => s.setStatus);
+
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [processedUrl, setProcessedUrl] = useState<string | null>(null);
 
   const isProcessing = status === "uploading" || status === "processing";
   const hasApproved = approvedStepIds.size > 0;
@@ -41,14 +55,43 @@ export function AgentPanel() {
 
   async function handleConfirm() {
     const approvedSteps = steps.filter((s) => approvedStepIds.has(s.id));
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+    setIsConfirming(true);
     try {
-      await fetch("/api/execute", {
+      const res = await fetch(`${apiUrl}/api/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, approvedSteps }),
+        body: JSON.stringify({
+          project_id: projectId,
+          approved_steps: approvedSteps.map((s) => ({
+            id: s.id,
+            type: s.type,
+            reason: s.reason,
+            start_time: s.startTime,
+            end_time: s.endTime,
+          })),
+        }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        setStatus("done");
+        setProcessedUrl(data.processed_url ?? null);
+      }
     } catch {
-      // Backend endpoint not yet implemented
+      // Network error — will be visible via project status
+    } finally {
+      setIsConfirming(false);
+    }
+  }
+
+  async function handleDownload() {
+    if (!processedUrl) return;
+    const supabase = createClient();
+    const { data } = await supabase.storage
+      .from("processed")
+      .createSignedUrl(processedUrl, 3600);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, "_blank");
     }
   }
 
@@ -77,7 +120,18 @@ export function AgentPanel() {
     return (
       <div className="flex flex-col h-full bg-surface">
         <div className="flex-1 flex items-center justify-center">
-          <p className="font-mono text-[12px] text-danger">Processing failed</p>
+          <div className="flex flex-col items-center gap-3 px-6 text-center">
+            <p className="font-mono text-[12px] text-danger">
+              Processing failed. Please try uploading your video again.
+            </p>
+            <Link
+              href="/projects"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-display font-medium rounded border border-border text-fg-secondary hover:text-fg hover:border-fg-muted transition-colors"
+            >
+              <ArrowLeft size={14} strokeWidth={1.5} />
+              Back to projects
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -168,16 +222,37 @@ export function AgentPanel() {
         )}
       </div>
 
-      {/* Footer — Confirm button */}
+      {/* Footer — Confirm button or download link */}
       {steps.length > 0 && (
         <div className="px-3 py-2.5 border-t border-border shrink-0">
-          <button
-            onClick={handleConfirm}
-            disabled={!hasApproved}
-            className="w-full py-2 bg-fg text-[#080809] font-display text-[12px] font-semibold tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            Confirm {approvedCount > 0 ? `${approvedCount} ` : ""}edits
-          </button>
+          {status === "done" && processedUrl ? (
+            <button
+              onClick={handleDownload}
+              className="w-full py-2 bg-fg text-[#080809] font-display text-[12px] font-semibold tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all inline-flex items-center justify-center gap-1.5"
+            >
+              <Download size={14} strokeWidth={1.5} />
+              Download processed video
+            </button>
+          ) : (
+            <button
+              onClick={handleConfirm}
+              disabled={!hasApproved || isConfirming}
+              className="w-full py-2 bg-fg text-[#080809] font-display text-[12px] font-semibold tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+            >
+              {isConfirming ? (
+                <>
+                  <Loader2
+                    size={14}
+                    strokeWidth={1.5}
+                    className="animate-spin"
+                  />
+                  Processing…
+                </>
+              ) : (
+                <>Confirm {approvedCount > 0 ? `${approvedCount} ` : ""}edits</>
+              )}
+            </button>
+          )}
         </div>
       )}
     </div>

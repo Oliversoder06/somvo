@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { User, Mail, CreditCard, Shield } from "lucide-react";
+import { User, Mail, CreditCard, Shield, ExternalLink } from "lucide-react";
+import { BillingPortalButton } from "./billing-portal-button";
 
 const PLAN_LABELS: Record<string, string> = {
   free: "Free",
@@ -96,10 +97,17 @@ export default async function SettingsPage() {
               {PLAN_LABELS[plan] ?? "Free"}
             </span>
           </div>
-          {plan === "free" && (
-            <p className="text-fg-muted text-[13px] mt-4">
-              Stripe billing integration coming soon.
-            </p>
+          {plan === "free" ? (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-fg-muted text-[13px]">
+                Upgrade to remove watermarks and unlock higher quality exports.
+              </p>
+              <BillingPortalButton />
+            </div>
+          ) : (
+            <div className="mt-4">
+              <BillingPortalButton />
+            </div>
           )}
         </div>
 

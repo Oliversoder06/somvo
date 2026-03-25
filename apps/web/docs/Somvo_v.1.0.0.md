@@ -78,9 +78,9 @@ Every edit follows this loop — this never changes across versions:
 - [x] Implement Supabase Auth (email + OAuth)
 - [x] Create `users` table with plan field (`free` | `creator` | `pro`)
 - [x] Protect routes — redirect unauthenticated users to login
-- [ ] Set up FastAPI project structure
-- [ ] Connect FastAPI to Supabase via service role key
-- [ ] Set up Modal.com account and link to FastAPI
+- [x] Set up FastAPI project structure
+- [x] Connect FastAPI to Supabase via service role key
+- [x] Set up Modal.com account and link to FastAPI
 
 ---
 
@@ -92,82 +92,82 @@ Every edit follows this loop — this never changes across versions:
 - [x] Generate a unique `project_id` per upload
 - [x] Store project metadata in `projects` table (user_id, filename, status, created_at)
 - [x] Show upload progress indicator
-- [ ] On upload complete, trigger backend processing job
+- [x] On upload complete, trigger backend processing job
 
 ---
 
 ### 3. Backend Processing Pipeline (Modal)
 
-- [ ] Set up Modal app with GPU-enabled functions
-- [ ] Build FFmpeg wrapper utility for Python
-- [ ] Integrate Silero VAD — detect silence segments, return timestamps
-- [ ] Integrate WhisperX — transcribe video, return word-level timestamps
-- [ ] Build cut list generator — combines VAD + transcript into proposed edit steps (JSON)
-- [ ] Store raw transcript and cut list in Supabase
-- [ ] Update project status in DB as pipeline progresses (`processing` → `ready`)
-- [ ] Handle pipeline errors gracefully — update status to `failed`, surface to frontend
+- [x] Set up Modal app with GPU-enabled functions
+- [x] Build FFmpeg wrapper utility for Python
+- [x] Integrate Silero VAD — detect silence segments, return timestamps
+- [x] Integrate WhisperX — transcribe video, return word-level timestamps
+- [x] Build cut list generator — combines VAD + transcript into proposed edit steps (JSON)
+- [x] Store raw transcript and cut list in Supabase
+- [x] Update project status in DB as pipeline progresses (`processing` → `ready`)
+- [x] Handle pipeline errors gracefully — update status to `failed`, surface to frontend
 
 ---
 
 ### 4. Agent Reasoning UI
 
-- [ ] Poll or subscribe (Supabase Realtime) for project status change to `ready`
-- [ ] Fetch proposed step list from backend
-- [ ] Render step list as a visible, ordered reasoning panel
-- [ ] Each step shows: type (cut, caption, trim), reason, affected timestamp range
-- [ ] Each step has Approve / Reject toggle
-- [ ] Show step count and estimated time saved
-- [ ] "Approve All" shortcut button
-- [ ] "Reject All" shortcut button
-- [ ] Approved steps highlighted, rejected steps visually dimmed
-- [ ] Confirm button — sends approved step list to execution endpoint
+- [x] Poll or subscribe (Supabase Realtime) for project status change to `ready`
+- [x] Fetch proposed step list from backend
+- [x] Render step list as a visible, ordered reasoning panel
+- [x] Each step shows: type (cut, caption, trim), reason, affected timestamp range
+- [x] Each step has Approve / Reject toggle
+- [x] Show step count and estimated time saved
+- [x] "Approve All" shortcut button
+- [x] "Reject All" shortcut button
+- [x] Approved steps highlighted, rejected steps visually dimmed
+- [x] Confirm button — sends approved step list to execution endpoint
 
 ---
 
 ### 5. Dual Timeline
 
-- [ ] Integrate Peaks.js for waveform visualisation
-- [ ] Render two tracks — raw audio (top) and edited audio (bottom)
-- [ ] Highlight silence regions on raw track
-- [ ] Mark cut regions as greyed out on edited track
-- [ ] Integrate React Player for video preview playback
-- [ ] Clicking a region in timeline seeks video to that point
-- [ ] Timeline and video player stay in sync during playback
-- [ ] Show caption markers on timeline as coloured ticks
+- [x] Integrate Peaks.js for waveform visualisation
+- [x] Render two tracks — raw audio (top) and edited audio (bottom)
+- [x] Highlight silence regions on raw track
+- [x] Mark cut regions as greyed out on edited track
+- [x] Integrate React Player for video preview playback
+- [x] Clicking a region in timeline seeks video to that point
+- [x] Timeline and video player stay in sync during playback
+- [x] Show caption markers on timeline as coloured ticks
 
 ---
 
 ### 6. Edit Execution
 
-- [ ] Build `/execute` API endpoint — accepts approved step list + project_id
-- [ ] Trigger Modal job to run FFmpeg commands for each approved step in order
-- [ ] Steps are applied sequentially and atomically — one failure does not block others
-- [ ] Store processed video in Supabase Storage (`processed/` bucket)
-- [ ] Update project status to `done`
-- [ ] Return processed video URL to frontend
+- [x] Build `/execute` API endpoint — accepts approved step list + project_id
+- [x] Trigger Modal job to run FFmpeg commands for each approved step in order
+- [x] Steps are applied sequentially and atomically — one failure does not block others
+- [x] Store processed video in Supabase Storage (`processed/` bucket)
+- [x] Update project status to `done`
+- [x] Return processed video URL to frontend
 
 ---
 
 ### 7. Captions
 
-- [ ] Use WhisperX word-level timestamps to generate caption segments
-- [ ] Store captions as SRT and as JSON in Supabase
+- [x] Use WhisperX word-level timestamps to generate caption segments
+- [x] Store captions as SRT and as JSON in Supabase
 - [ ] Render captions as an overlay on the video preview
 - [ ] Basic caption style controls — font size, colour, position (top / bottom)
 - [ ] Allow user to edit individual caption lines in a caption panel
-- [ ] Burn captions into exported video via FFmpeg (free and paid tiers)
+- [x] Burn captions into exported video via FFmpeg (free and paid tiers)
 
 ---
 
 ### 8. Export
 
-- [ ] Build export trigger button in UI
-- [ ] Trigger Modal FFmpeg job to produce final export file
-- [ ] **Free tier:** apply watermark (bottom-right logo overlay), cap at 720p / 30fps
-- [ ] **Paid tiers:** clean export, up to 1080p / 60fps
+- [x] Build export trigger button in UI
+- [x] Trigger Modal FFmpeg job to produce final export file
+- [x] **Free tier:** apply watermark (bottom-right logo overlay), cap at 720p / 30fps
+- [x] **Paid tiers:** clean export, up to 1080p / 60fps
 - [ ] Track export minutes in `usage` table (linked to user + project)
-- [ ] Show export progress indicator
-- [ ] On complete, provide download link (signed Supabase Storage URL)
+- [x] Show export progress indicator
+- [x] On complete, provide download link (signed Supabase Storage URL)
 - [ ] Store export metadata (resolution, duration, tier, timestamp)
 
 ---
@@ -190,17 +190,17 @@ Every edit follows this loop — this never changes across versions:
 - [x] Project card shows: thumbnail, filename, status, created date
 - [x] Delete project (soft delete — mark as deleted, do not purge storage immediately)
 - [x] Account settings page — name, email, plan info
-- [ ] Link to billing portal (Stripe Customer Portal)
+- [x] Link to billing portal (Stripe Customer Portal)
 
 ---
 
 ### 11. Error Handling & Edge Cases
 
-- [ ] Handle upload failures — retry or clear and re-upload
-- [ ] Handle pipeline timeouts on Modal — surface friendly error to user
+- [x] Handle upload failures — retry or clear and re-upload
+- [x] Handle pipeline timeouts on Modal — surface friendly error to user
 - [ ] Handle empty transcript (no speech detected) — inform user, allow manual edit
 - [ ] Handle video with no silence (nothing to cut) — inform user, show transcript only
-- [ ] Validate approved step list before execution — reject malformed inputs
+- [x] Validate approved step list before execution — reject malformed inputs
 - [ ] Rate limit API endpoints per user
 
 ---
