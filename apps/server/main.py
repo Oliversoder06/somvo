@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.process import router as process_router
 from api.execute import router as execute_router
+from api.analyse import router as analyse_router
 
 app = FastAPI(title="Somvo API", version="1.0.0")
 
@@ -25,6 +26,7 @@ app.add_middleware(
 
 app.include_router(process_router, prefix="/api")
 app.include_router(execute_router, prefix="/api")
+app.include_router(analyse_router, prefix="/api")
 
 
 @app.get("/health")

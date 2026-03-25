@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback } from "react";
-import { Play, Pause, Loader2, Maximize2, Volume2 } from "lucide-react";
+import { useCallback, useEffect } from "react";
+import { Play, Pause, Loader2 } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
 
-function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
+function formatTimecode(seconds: number) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 10);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${ms}`;
+  const f = Math.floor((seconds % 1) * 30);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}:${String(f).padStart(2, "0")}`;
 }
 
 export function VideoPreview({
@@ -24,6 +25,9 @@ export function VideoPreview({
   const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
   const setDuration = useEditorStore((s) => s.setDuration);
   const setIsPlaying = useEditorStore((s) => s.setIsPlaying);
+  const previewMode = useEditorStore((s) => s.previewMode);
+  const setPreviewMode = useEditorStore((s) => s.setPreviewMode);
+  const steps = useEditorStore((s) => s.steps);
 
   const togglePlay = useCallback(() => {
     const el = playerRef.current;
@@ -31,15 +35,24 @@ export function VideoPreview({
     if (isPlaying) {
       el.pause();
     } else {
-      el.play().catch(() => {
-        // Source not loaded or unsupported — keep paused state
-        setIsPlaying(false);
-      });
+      el.play().catch(() => setIsPlaying(false));
     }
   }, [isPlaying, setIsPlaying, playerRef]);
 
+  // Preview mode: skip over approved cuts during playback
+  useEffect(() => {
+    if (!previewMode) return;
+    const acceptedCuts = steps.filter((s) => s.status === "approved");
+    const insideCut = acceptedCuts.find(
+      (cut) => currentTime >= cut.startTime && currentTime < cut.endTime,
+    );
+    if (insideCut) {
+      playerRef.current?.currentTime &&
+        (playerRef.current.currentTime = insideCut.endTime);
+    }
+  }, [currentTime, previewMode, steps, playerRef]);
+
   const isProcessing = status === "uploading" || status === "processing";
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
     <div className="flex flex-col h-full bg-base">
@@ -51,12 +64,8 @@ export function VideoPreview({
             ref={playerRef}
             src={videoUrl}
             preload="auto"
-            onTimeUpdate={(e) => {
-              setCurrentTime(e.currentTarget.currentTime);
-            }}
-            onLoadedMetadata={(e) => {
-              setDuration(e.currentTarget.duration);
-            }}
+            onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
             onPause={() => setIsPlaying(false)}
             onPlay={() => setIsPlaying(true)}
             onEnded={() => setIsPlaying(false)}
@@ -83,25 +92,14 @@ export function VideoPreview({
         {isProcessing && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-base/90">
             <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full border-2 border-border flex items-center justify-center">
-                  <Loader2
-                    size={24}
-                    strokeWidth={1.5}
-                    className="text-info animate-spin"
-                  />
-                </div>
-              </div>
-              <div className="text-center">
-                <p className="font-display text-[13px] font-semibold text-fg mb-1">
-                  {status === "uploading" ? "Uploading…" : "Processing…"}
-                </p>
-                <p className="font-mono text-[11px] text-fg-muted">
-                  {status === "uploading"
-                    ? "Uploading your video"
-                    : "Analysing audio, detecting silence"}
-                </p>
-              </div>
+              <Loader2
+                size={24}
+                strokeWidth={1.5}
+                className="text-info animate-spin"
+              />
+              <p className="font-mono text-[12px] text-fg-muted">
+                {status === "uploading" ? "Uploading…" : "Processing…"}
+              </p>
             </div>
           </div>
         )}
@@ -109,13 +107,7 @@ export function VideoPreview({
         {/* No video placeholder */}
         {!videoUrl && !isProcessing && (
           <div className="flex flex-col items-center gap-3 text-center">
-            <div className="w-14 h-14 rounded-full border border-border flex items-center justify-center">
-              <Play
-                size={20}
-                strokeWidth={1.5}
-                className="text-fg-muted ml-0.5"
-              />
-            </div>
+            <Play size={24} strokeWidth={1.5} className="text-fg-muted" />
             <p className="font-mono text-[11px] text-fg-muted">
               No video loaded
             </p>
@@ -123,58 +115,55 @@ export function VideoPreview({
         )}
       </div>
 
-      {/* Transport bar */}
+      {/* ── Transport bar ────────────────────────────────── */}
       <div className="shrink-0 border-t border-border bg-surface">
-        {/* Scrubber track */}
-        <div
-          className="h-1 w-full bg-elevated relative cursor-pointer group"
-          onClick={(e) => {
-            if (duration <= 0) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const pct = (e.clientX - rect.left) / rect.width;
-            const newTime = pct * duration;
-            if (playerRef.current) playerRef.current.currentTime = newTime;
-            setCurrentTime(newTime);
-          }}
-        >
-          <div
-            className="absolute top-0 left-0 h-full bg-accent transition-[width] duration-75"
-            style={{ width: `${progressPercent}%` }}
-          />
-          <div
-            className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
-            style={{ left: `${progressPercent}%`, marginLeft: -5 }}
-          />
-        </div>
-
-        {/* Controls row */}
-        <div className="flex items-center gap-3 px-3 py-1.5">
+        <div className="flex items-center h-10 px-3 gap-3">
+          {/* Left: play + timecode */}
           <button
             onClick={togglePlay}
             disabled={!videoUrl}
             className="flex items-center justify-center w-7 h-7 rounded-md text-fg-secondary hover:text-fg transition-colors disabled:opacity-30"
           >
             {isPlaying ? (
-              <Pause size={14} strokeWidth={1.5} />
+              <Pause size={15} strokeWidth={1.5} />
             ) : (
-              <Play size={14} strokeWidth={1.5} />
+              <Play size={15} strokeWidth={1.5} />
             )}
           </button>
-
-          <span className="font-mono text-[11px] text-fg-secondary tabular-nums">
-            {formatTime(currentTime)}
-            <span className="text-fg-muted mx-1">/</span>
-            {formatTime(duration)}
+          <span className="font-mono text-[12px] text-fg-secondary tabular-nums tracking-wide">
+            {formatTimecode(currentTime)}
           </span>
 
           <div className="flex-1" />
 
-          <button className="flex items-center justify-center w-7 h-7 rounded-md text-fg-muted hover:text-fg-secondary transition-colors">
-            <Volume2 size={13} strokeWidth={1.5} />
-          </button>
-          <button className="flex items-center justify-center w-7 h-7 rounded-md text-fg-muted hover:text-fg-secondary transition-colors">
-            <Maximize2 size={13} strokeWidth={1.5} />
-          </button>
+          {/* Center: Original / Preview toggle */}
+          <div className="flex items-center gap-1 bg-elevated rounded-md p-0.5">
+            <button
+              onClick={() => setPreviewMode(false)}
+              className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
+                !previewMode
+                  ? "bg-surface text-fg"
+                  : "text-fg-muted hover:text-fg-secondary"
+              }`}
+            >
+              Original
+            </button>
+            <button
+              onClick={() => setPreviewMode(true)}
+              className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors ${
+                previewMode
+                  ? "bg-surface text-fg"
+                  : "text-fg-muted hover:text-fg-secondary"
+              }`}
+            >
+              Preview
+            </button>
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Right: zoom */}
+          <span className="font-mono text-[11px] text-fg-muted">100%</span>
         </div>
       </div>
     </div>

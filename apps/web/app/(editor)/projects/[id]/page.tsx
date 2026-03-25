@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Panel, Group, Separator } from "react-resizable-panels";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEditorStore, type EditStep } from "@/lib/store/editor";
 import { VideoPreview } from "@/components/editor/video-preview";
@@ -25,10 +25,11 @@ export default function EditorPage() {
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const setIsPlaying = useEditorStore((s) => s.setIsPlaying);
   const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
-  const steps = useEditorStore((s) => s.steps);
-  const focusedStepIndex = useEditorStore((s) => s.focusedStepIndex);
-  const approveStep = useEditorStore((s) => s.approveStep);
-  const rejectStep = useEditorStore((s) => s.rejectStep);
+  const addStep = useEditorStore((s) => s.addStep);
+  const setAgentStatus = useEditorStore((s) => s.setAgentStatus);
+  const clearAgent = useEditorStore((s) => s.clearAgent);
+
+  const [prompt, setPrompt] = useState("");
 
   // Fetch project data
   const { data: project, isLoading } = useQuery({
@@ -42,18 +43,24 @@ export default function EditorPage() {
       if (error) throw error;
       return data;
     },
-    refetchInterval: (query) => {
-      const s = query.state.data?.status;
-      return s === "processing" ? 3000 : false;
-    },
   });
 
-  // Sync project data into Zustand store
+  // Sync project data into Zustand store — set to 'ready' (no auto-processing)
   useEffect(() => {
     if (!project) return;
     setProjectId(project.id);
     setProjectName(project.filename);
-    setStatus(project.status);
+    // If project was left in processing state, reset to ready
+    const effectiveStatus =
+      project.status === "processing" ? "ready" : project.status;
+    setStatus(
+      effectiveStatus as
+        | "ready"
+        | "done"
+        | "failed"
+        | "uploading"
+        | "processing",
+    );
   }, [project, setProjectId, setProjectName, setStatus]);
 
   // Generate signed URL when project is available
@@ -81,7 +88,7 @@ export default function EditorPage() {
     getSignedUrl();
   }, [project?.raw_url, supabase.storage, setVideoUrl, project]);
 
-  // Fetch edit steps when status becomes ready
+  // Fetch existing edit steps if project already has them
   const fetchEditSteps = useCallback(async () => {
     const { data } = await supabase
       .from("edit_steps")
@@ -92,7 +99,12 @@ export default function EditorPage() {
       .single();
 
     if (data?.steps) {
-      setSteps(data.steps as unknown as EditStep[]);
+      // Map existing steps to include status field
+      const mapped = (data.steps as unknown as EditStep[]).map((s) => ({
+        ...s,
+        status: s.status ?? ("pending" as const),
+      }));
+      setSteps(mapped);
     }
   }, [id, supabase, setSteps]);
 
@@ -102,38 +114,58 @@ export default function EditorPage() {
     }
   }, [project?.status, fetchEditSteps]);
 
-  // Supabase Realtime subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel(`project-status-${id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "projects",
-          filter: `id=eq.${id}`,
-        },
-        (payload) => {
-          const newStatus = (payload.new as { status: string }).status as
-            | "uploading"
-            | "processing"
-            | "ready"
-            | "done"
-            | "failed";
-          setStatus(newStatus);
+  // SSE stream handler for /api/analyse
+  const handleSubmitPrompt = useCallback(async () => {
+    if (!prompt.trim() || !id) return;
+    const currentPrompt = prompt;
+    setPrompt("");
+    clearAgent();
 
-          if (newStatus === "ready") {
-            fetchEditSteps();
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+    try {
+      const response = await fetch(`${apiUrl}/api/analyse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id: id, prompt: currentPrompt }),
+      });
+
+      if (!response.body) return;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === "status") {
+              setAgentStatus(event.message);
+            }
+            if (event.type === "cut") {
+              addStep({
+                ...event.step,
+                status: "pending" as const,
+              });
+            }
+            if (event.type === "done") {
+              setAgentStatus(null);
+            }
+          } catch {
+            // Ignore malformed SSE lines
           }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [id, supabase, setStatus, fetchEditSteps]);
+        }
+      }
+    } catch {
+      setAgentStatus(null);
+    }
+  }, [prompt, id, clearAgent, setAgentStatus, addStep]);
 
   // Keyboard shortcuts
   useHotkeys(
@@ -166,18 +198,6 @@ export default function EditorPage() {
     setCurrentTime(el.currentTime);
   });
 
-  useHotkeys("a", () => {
-    if (steps.length > 0 && steps[focusedStepIndex]) {
-      approveStep(steps[focusedStepIndex].id);
-    }
-  });
-
-  useHotkeys("r", () => {
-    if (steps.length > 0 && steps[focusedStepIndex]) {
-      rejectStep(steps[focusedStepIndex].id);
-    }
-  });
-
   // Loading state
   if (isLoading) {
     return (
@@ -198,29 +218,53 @@ export default function EditorPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Vertical split: top panels + bottom timeline */}
-      <Group orientation="vertical" id="editor-v">
-        {/* Top section: Video preview + Agent panel */}
-        <Panel defaultSize="75%" minSize="40%">
-          <Group orientation="horizontal" id="editor-h">
-            <Panel defaultSize="60%" minSize="30%">
-              <VideoPreview playerRef={playerRef} />
-            </Panel>
-            <Separator className="w-[3px] bg-border hover:bg-accent/40 active:bg-accent/60 transition-colors cursor-col-resize" />
-            <Panel defaultSize="40%" minSize="20%">
-              <AgentPanel />
-            </Panel>
-          </Group>
-        </Panel>
+      {/* Main content: video + agent panel */}
+      <div className="flex-1 min-h-0">
+        <Group orientation="horizontal" id="editor-h">
+          {/* Video preview */}
+          <Panel defaultSize="60%" minSize="35%">
+            <VideoPreview playerRef={playerRef} />
+          </Panel>
 
-        {/* Resize handle between panels and timeline */}
-        <Separator className="h-[3px] bg-border hover:bg-accent/40 active:bg-accent/60 transition-colors cursor-row-resize" />
+          <Separator className="w-px bg-border hover:bg-accent/40 active:bg-accent/60 transition-colors cursor-col-resize" />
 
-        {/* Bottom section: Dual timeline — now resizable */}
-        <Panel defaultSize="25%" minSize="10%">
-          <Timeline playerRef={playerRef} />
-        </Panel>
-      </Group>
+          {/* Agent panel */}
+          <Panel defaultSize="40%" minSize="25%">
+            <AgentPanel />
+          </Panel>
+        </Group>
+      </div>
+
+      {/* Timeline — fixed 140px */}
+      <Timeline playerRef={playerRef} />
+
+      {/* Prompt bar — fixed 56px */}
+      <div
+        className="shrink-0 flex items-center gap-3 px-4 border-t border-border"
+        style={{ height: 56, background: "var(--bg-surface)" }}
+      >
+        <input
+          type="text"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmitPrompt();
+            }
+          }}
+          placeholder="What do you want to do with this video?"
+          className="flex-1 bg-elevated border border-border rounded-md px-3 py-2 text-[13px] text-fg placeholder:text-fg-muted font-body outline-none focus:border-fg-muted transition-colors"
+        />
+        {prompt.trim() && (
+          <button
+            onClick={handleSubmitPrompt}
+            className="flex items-center justify-center w-8 h-8 rounded-md bg-fg text-[#080809] hover:bg-accent-hover transition-colors shrink-0"
+          >
+            <ArrowRight size={16} strokeWidth={1.5} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

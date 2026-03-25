@@ -4,10 +4,7 @@ modal
 supabase
 python-dotenv
 ffmpeg-python
-whisperx
-torch
-torchaudio
-silero-vad
+openai
 pydantic
 python-multipart
 httpx
