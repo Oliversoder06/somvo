@@ -105,6 +105,8 @@ export default function EditorPage() {
     fetchSteps();
   }, [project?.status, id, supabase, addStep, setAgentState]);
 
+  const pipelineVersion = useEditorStore((s) => s.pipelineVersion);
+
   // SSE stream handler
   const handleSubmitPrompt = useCallback(async () => {
     if (!prompt.trim() || !id) return;
@@ -120,7 +122,11 @@ export default function EditorPage() {
       const response = await fetch(`${apiUrl}/api/analyse`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ project_id: id, prompt: currentPrompt }),
+        body: JSON.stringify({
+          project_id: id,
+          prompt: currentPrompt,
+          pipeline_version: pipelineVersion,
+        }),
       });
 
       if (!response.body) return;
@@ -149,7 +155,15 @@ export default function EditorPage() {
     } catch {
       setAgentState("failed");
     }
-  }, [prompt, id, setAgentState, clearSteps, addAgentMessage, addStep]);
+  }, [
+    prompt,
+    id,
+    pipelineVersion,
+    setAgentState,
+    clearSteps,
+    addAgentMessage,
+    addStep,
+  ]);
 
   // Keyboard shortcuts
   useHotkeys(

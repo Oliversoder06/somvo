@@ -13,6 +13,40 @@ export type EditStep = {
 
 export type AgentState = "idle" | "streaming" | "done" | "failed";
 
+export type PipelineVersion = {
+  id: string;
+  name: string;
+  description: string;
+  minPlan: "free" | "creator" | "pro";
+  available: boolean;
+};
+
+export const PIPELINE_VERSIONS: PipelineVersion[] = [
+  {
+    id: "v1",
+    name: "Somvo v1",
+    description:
+      "Great for cutting out silences, simple filler words and generating captions",
+    minPlan: "free",
+    available: true,
+  },
+  // {
+  //   id: "v2",
+  //   name: "Somvo v2",
+  //   description:
+  //     "GPT-4o filler detection, caption generation & prompt understanding",
+  //   minPlan: "creator",
+  //   available: false,
+  // },
+  // {
+  //   id: "v3",
+  //   name: "Somvo v3",
+  //   description: "Style matching, brand kits & multi-clip editing",
+  //   minPlan: "pro",
+  //   available: false,
+  // },
+];
+
 interface EditorStore {
   projectId: string | null;
   projectName: string;
@@ -22,6 +56,7 @@ interface EditorStore {
   currentTime: number;
   isPlaying: boolean;
   previewMode: boolean;
+  pipelineVersion: string;
 
   agentState: AgentState;
   agentMessages: string[];
@@ -35,6 +70,7 @@ interface EditorStore {
   setCurrentTime: (t: number) => void;
   setIsPlaying: (p: boolean) => void;
   setPreviewMode: (m: boolean) => void;
+  setPipelineVersion: (v: string) => void;
   timelineZoom: number;
   setTimelineZoom: (z: number) => void;
   timelineHeight: number;
@@ -60,6 +96,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   currentTime: 0,
   isPlaying: false,
   previewMode: false,
+  pipelineVersion: "v1",
   timelineZoom: 1,
   timelineHeight: 200,
   agentPanelOpen: true,
@@ -76,6 +113,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setCurrentTime: (t) => set({ currentTime: t }),
   setIsPlaying: (p) => set({ isPlaying: p }),
   setPreviewMode: (m) => set({ previewMode: m }),
+  setPipelineVersion: (v) => set({ pipelineVersion: v }),
   setTimelineZoom: (z) => set({ timelineZoom: Math.max(1, Math.min(20, z)) }),
   setTimelineHeight: (h) =>
     set({ timelineHeight: Math.max(120, Math.min(400, h)) }),

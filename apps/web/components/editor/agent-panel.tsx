@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2,
@@ -14,8 +14,10 @@ import {
   MessageSquare,
   PanelRightClose,
   PanelRightOpen,
+  ChevronDown,
+  Lock,
 } from "lucide-react";
-import { useEditorStore } from "@/lib/store/editor";
+import { useEditorStore, PIPELINE_VERSIONS } from "@/lib/store/editor";
 import { StepCard } from "./step-card";
 
 function formatDuration(seconds: number) {
@@ -58,8 +60,30 @@ export function AgentPanel({
   const duration = useEditorStore((s) => s.duration);
   const agentPanelOpen = useEditorStore((s) => s.agentPanelOpen);
   const toggleAgentPanel = useEditorStore((s) => s.toggleAgentPanel);
+  const pipelineVersion = useEditorStore((s) => s.pipelineVersion);
+  const setPipelineVersion = useEditorStore((s) => s.setPipelineVersion);
 
   const [isConfirming, setIsConfirming] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const selectedPipeline =
+    PIPELINE_VERSIONS.find((p) => p.id === pipelineVersion) ??
+    PIPELINE_VERSIONS[0];
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [dropdownOpen]);
 
   const hasApproved = steps.some((s) => s.status === "approved");
 
@@ -145,16 +169,185 @@ export function AgentPanel({
             opacity: 0.3,
           }}
         />
-        <span
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: 13,
-            fontWeight: 700,
-            color: "var(--text-primary)",
-          }}
-        >
-          Director
-        </span>
+        <div ref={dropdownRef} style={{ position: "relative" }}>
+          <button
+            onClick={() => setDropdownOpen((o) => !o)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              padding: "2px 0",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--text-primary)",
+              }}
+            >
+              {selectedPipeline.name}
+            </span>
+            <ChevronDown
+              size={12}
+              strokeWidth={1.5}
+              style={{
+                color: "var(--text-muted)",
+                transform: dropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 150ms ease",
+              }}
+            />
+          </button>
+
+          {/* Pipeline version dropdown */}
+          <AnimatePresence>
+            {dropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.12 }}
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  left: 0,
+                  width: 260,
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--bg-border)",
+                  borderRadius: 10,
+                  padding: 6,
+                  zIndex: 50,
+                  boxShadow:
+                    "0 8px 32px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.04)",
+                }}
+              >
+                {PIPELINE_VERSIONS.map((p) => {
+                  const isSelected = p.id === pipelineVersion;
+                  const isLocked = !p.available;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        if (isLocked) return;
+                        setPipelineVersion(p.id);
+                        setDropdownOpen(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        width: "100%",
+                        padding: "10px 10px",
+                        borderRadius: 7,
+                        border: "none",
+                        background: isSelected
+                          ? "rgba(255,106,82,.08)"
+                          : "transparent",
+                        cursor: isLocked ? "default" : "pointer",
+                        opacity: isLocked ? 0.45 : 1,
+                        textAlign: "left",
+                        transition: "background 100ms ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isLocked && !isSelected)
+                          e.currentTarget.style.background =
+                            "rgba(255,255,255,.04)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isLocked && !isSelected)
+                          e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      {/* Radio dot */}
+                      <div
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: "50%",
+                          border: isSelected
+                            ? "2px solid var(--accent)"
+                            : "1.5px solid var(--text-muted)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          marginTop: 2,
+                        }}
+                      >
+                        {isSelected && (
+                          <div
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: "var(--accent)",
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          className="flex items-center gap-1.5"
+                          style={{ marginBottom: 2 }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: "var(--font-display)",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: isSelected
+                                ? "var(--accent)"
+                                : "var(--text-primary)",
+                            }}
+                          >
+                            {p.name}
+                          </span>
+                          {isLocked && (
+                            <Lock
+                              size={10}
+                              strokeWidth={1.5}
+                              style={{ color: "var(--text-muted)" }}
+                            />
+                          )}
+                          {!p.available && (
+                            <span
+                              style={{
+                                fontFamily: "var(--font-mono)",
+                                fontSize: 9,
+                                color: "var(--text-muted)",
+                                background: "rgba(255,255,255,.06)",
+                                padding: "1px 5px",
+                                borderRadius: 4,
+                                letterSpacing: "0.03em",
+                              }}
+                            >
+                              {p.minPlan}
+                            </span>
+                          )}
+                        </div>
+                        <span
+                          style={{
+                            fontFamily: "var(--font-body)",
+                            fontSize: 11,
+                            color: "var(--text-muted)",
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {p.description}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
         <div className="flex items-center gap-2">
           {isStreaming && (
             <span

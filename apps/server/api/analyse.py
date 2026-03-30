@@ -9,10 +9,8 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from lib.cut_list import generate_cut_list
-from lib.silence_detection import detect_silence_combined
 from lib.supabase import get_supabase
-from lib.transcribe_openai import transcribe_video
+from pipelines import get_pipeline
 
 router = APIRouter()
 
@@ -20,10 +18,14 @@ router = APIRouter()
 class AnalyseRequest(BaseModel):
     project_id: str
     prompt: str
+    pipeline_version: str = "v1"
 
 
-async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, None]:
+async def analysis_stream(
+    project_id: str, prompt: str, pipeline_version: str = "v1"
+) -> AsyncGenerator[str, None]:
     supabase = get_supabase()
+    pipeline = get_pipeline(pipeline_version)
 
     # Fetch project
     project = (
@@ -50,25 +52,20 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
         probe = ffmpeg_lib.probe(video_path)
         duration = float(probe["format"]["duration"])
 
-        yield f"data: {json.dumps({'type': 'status', 'message': 'Transcribing audio...'})}\n\n"
+        # Run the selected pipeline — it yields status messages + a final result
+        steps = []
+        pipeline_log = None
+        transcript = None
 
-        # Transcribe
-        transcript = transcribe_video(video_path)
+        async for event in pipeline.analyse(video_path, prompt, duration):
+            if event["type"] == "status":
+                yield f"data: {json.dumps({'type': 'status', 'message': event['message']})}\n\n"
+            elif event["type"] == "result":
+                steps = event["steps"]
+                pipeline_log = event["log"]
+                transcript = event["transcript"]
 
-        word_count = len(transcript["words"])
-        yield f"data: {json.dumps({'type': 'status', 'message': f'Found {word_count} words'})}\n\n"
-
-        # Detect silence — cross-validates transcript gaps with audio energy
-        silences = detect_silence_combined(video_path, transcript["words"])
-
-        yield f"data: {json.dumps({'type': 'status', 'message': f'Detected {len(silences)} silence regions'})}\n\n"
-
-        # Generate cut list
-        steps, pipeline_log = generate_cut_list(silences, transcript, duration)
-
-        yield f"data: {json.dumps({'type': 'status', 'message': 'Proposing cuts...'})}\n\n"
-
-        # Stream each cut as it's generated
+        # Stream each cut to the client
         for step in steps:
             step_dict = {
                 "id": step.id,
@@ -81,19 +78,21 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
             }
             yield f"data: {json.dumps({'type': 'cut', 'step': step_dict})}\n\n"
 
-        # Stream the pipeline log summary to the frontend
-        log_summary = pipeline_log.summary()
-        yield f"data: {json.dumps({'type': 'log_summary', 'summary': log_summary})}\n\n"
+        # Stream pipeline log summary
+        if pipeline_log:
+            log_summary = pipeline_log.summary()
+            yield f"data: {json.dumps({'type': 'log_summary', 'summary': log_summary})}\n\n"
 
         # Store transcript in Supabase
-        supabase.table("transcripts").upsert(
-            {
-                "project_id": project_id,
-                "words": transcript["words"],
-                "srt": transcript["srt"],
-            },
-            on_conflict="project_id",
-        ).execute()
+        if transcript:
+            supabase.table("transcripts").upsert(
+                {
+                    "project_id": project_id,
+                    "words": transcript["words"],
+                    "srt": transcript["srt"],
+                },
+                on_conflict="project_id",
+            ).execute()
 
         # Store edit steps + pipeline log in Supabase
         steps_payload = [
@@ -112,7 +111,7 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
             {
                 "project_id": project_id,
                 "steps": steps_payload,
-                "pipeline_log": pipeline_log.summary(),
+                "pipeline_log": pipeline_log.summary() if pipeline_log else {},
             },
             on_conflict="project_id",
         ).execute()
@@ -143,7 +142,7 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
 @router.post("/analyse")
 async def analyse_video(req: AnalyseRequest):
     return StreamingResponse(
-        analysis_stream(req.project_id, req.prompt),
+        analysis_stream(req.project_id, req.prompt, req.pipeline_version),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
