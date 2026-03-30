@@ -14,7 +14,7 @@ def extract_audio(video_path: str, output_path: str) -> str:
 
 
 def cut_silence(video_path: str, silence_segments: list[dict], output_path: str) -> str:
-    """Remove silence segments from a video using FFmpeg select/concat."""
+    """Remove silence segments from a video using per-segment seek + concat."""
     if not silence_segments:
         import shutil
         shutil.copy2(video_path, output_path)
@@ -38,17 +38,21 @@ def cut_silence(video_path: str, silence_segments: list[dict], output_path: str)
         shutil.copy2(video_path, output_path)
         return output_path
 
-    # Build select expression for video and audio
-    select_parts = [f"between(t,{s:.3f},{e:.3f})" for s, e in keep]
-    select_expr = "+".join(select_parts)
+    # Seek into the source file once per keep-segment and concat.
+    # This guarantees audio and video are cut at the same boundaries
+    # and avoids the timestamp drift of select/aselect + setpts/asetpts.
+    segments = []
+    for start, end in keep:
+        seg = ffmpeg.input(video_path, ss=start, t=end - start)
+        segments.extend([seg.video, seg.audio])
 
-    inp = ffmpeg.input(video_path)
-    v = inp.video.filter("select", select_expr).filter("setpts", "N/FRAME_RATE/TB")
-    a = inp.audio.filter("aselect", select_expr).filter("asetpts", "N/SR/TB")
+    joined = ffmpeg.concat(*segments, v=1, a=1).node
+    v_out = joined[0]
+    a_out = joined[1].filter("highpass", f=20)  # Remove DC offset clicks at splice points
 
     (
         ffmpeg
-        .output(v, a, output_path)
+        .output(v_out, a_out, output_path)
         .overwrite_output()
         .run(quiet=True)
     )

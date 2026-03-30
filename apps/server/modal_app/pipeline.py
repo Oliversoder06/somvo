@@ -26,7 +26,7 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
     import ffmpeg as ffmpeg_lib
 
     from lib.cut_list import generate_cut_list
-    from lib.silence_detection import derive_silence_from_words
+    from lib.silence_detection import detect_silence_combined
     from lib.supabase import get_supabase
     from lib.transcribe_openai import transcribe_video
 
@@ -48,8 +48,8 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
         # 2. Transcribe using OpenAI Whisper API
         transcript = transcribe_video(video_path)
 
-        # 3. Derive silence from word gaps
-        silences = derive_silence_from_words(transcript["words"])
+        # 3. Cross-validate silence using transcript gaps + audio energy
+        silences = detect_silence_combined(video_path, transcript["words"])
 
         # 4. Generate cut list
         steps = generate_cut_list(silences, transcript, duration)

@@ -4,7 +4,7 @@ from openai import OpenAI
 
 def transcribe_video(video_path: str) -> dict:
     """
-    Transcribe video using OpenAI Whisper API.
+    Transcribe video using OpenAI Whisper API. 
     Returns word-level timestamps and SRT string.
     """
     client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])

@@ -2,34 +2,47 @@ from uuid import uuid4
 
 from lib.step_types import EditStep
 
-FILLER_WORDS = [
-    "um", "uh", "like", "you know", "basically",
-    "literally", "actually", "so", "right",
-]
+FILLER_WORDS = {
+    "um", "uh", "uh-huh", "mm", "hmm", "mhm",
+    "like", "basically", "literally",
+    "actually", "so", "right",
+}
+
+# 75ms padding on each side prevents clipped syllables at cut boundaries
+PADDING_S = 0.075
 
 
 def generate_cut_list(
     silence_segments: list[dict],
     transcript: dict,
     duration: float,
+    min_silence: float = 0.5,
+    padding: float = PADDING_S,
 ) -> list[EditStep]:
     steps: list[EditStep] = []
 
-    # 1. CUT_SILENCE for each silence segment > 0.5s
+    # 1. CUT_SILENCE — apply padding to protect surrounding speech
     for seg in silence_segments:
-        gap = seg["end"] - seg["start"]
-        if gap > 0.5:
-            steps.append(EditStep(
-                id=str(uuid4()),
-                type="cut_silence",
-                reason=f"Removes {gap:.1f}s of silence",
-                start_time=seg["start"],
-                end_time=seg["end"],
-            ))
+        raw_gap = seg["end"] - seg["start"]
+        if raw_gap <= min_silence:
+            continue
+        # Shrink cut from both sides by padding amount
+        padded_start = round(seg["start"] + padding, 3)
+        padded_end = round(seg["end"] - padding, 3)
+        if padded_end <= padded_start:
+            continue
+        cut_dur = padded_end - padded_start
+        steps.append(EditStep(
+            id=str(uuid4()),
+            type="cut_silence",
+            reason=f"Removes {cut_dur:.1f}s of silence",
+            start_time=padded_start,
+            end_time=padded_end,
+        ))
 
     # 2. CUT_FILLER for each filler word
     for word in transcript.get("words", []):
-        cleaned = word["word"].lower().strip(".,!?")
+        cleaned = word["word"].lower().strip(".,!?;:'\"")
         if cleaned in FILLER_WORDS:
             steps.append(EditStep(
                 id=str(uuid4()),

@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from lib.cut_list import generate_cut_list
-from lib.silence_detection import derive_silence_from_words
+from lib.silence_detection import detect_silence_combined
 from lib.supabase import get_supabase
 from lib.transcribe_openai import transcribe_video
 
@@ -58,8 +58,8 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
         word_count = len(transcript["words"])
         yield f"data: {json.dumps({'type': 'status', 'message': f'Found {word_count} words'})}\n\n"
 
-        # Detect silence
-        silences = derive_silence_from_words(transcript["words"])
+        # Detect silence — cross-validates transcript gaps with audio energy
+        silences = detect_silence_combined(video_path, transcript["words"])
 
         yield f"data: {json.dumps({'type': 'status', 'message': f'Detected {len(silences)} silence regions'})}\n\n"
 
