@@ -41,7 +41,8 @@ export function DeleteProjectButton({ projectId }: { projectId: string }) {
         <button
           onClick={handleDelete}
           disabled={deleting}
-          className="px-3 py-1.5 text-[13px] font-display font-medium text-white bg-danger rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="px-3 py-1.5 text-[13px] font-display font-medium rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+          style={{ background: "var(--danger)", color: "var(--text-primary)" }}
         >
           {deleting ? "Deleting…" : "Confirm Delete"}
         </button>

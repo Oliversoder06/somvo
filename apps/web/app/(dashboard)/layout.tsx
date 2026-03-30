@@ -1,5 +1,4 @@
-import { Topbar } from "@/components/topbar";
-import { Sidebar } from "@/components/sidebar";
+import { TopbarNav } from "@/components/topbar-nav";
 import { Providers } from "@/components/providers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -26,22 +25,14 @@ export default async function DashboardLayout({
 
   return (
     <Providers>
-      <div className="flex h-screen overflow-hidden bg-surface">
-        {/* Sidebar — shares surface bg with topbar */}
-        <Sidebar />
-
-        {/* Right column: topbar + inset content */}
-        <div className="flex flex-col flex-1 min-w-0">
-          <Topbar email={user?.email ?? null} plan={plan} />
-
-          {/* Inset main area with rounded top-left corner */}
-          <main
-            className="flex-1 overflow-y-auto rounded-tl-xl bg-base"
-            id="main-content"
-          >
-            <div className="mx-auto max-w-300 p-8">{children}</div>
-          </main>
-        </div>
+      <div
+        className="flex flex-col h-screen overflow-hidden"
+        style={{ background: "var(--bg-base)" }}
+      >
+        <TopbarNav email={user?.email ?? null} plan={plan} />
+        <main className="flex-1 overflow-y-auto" id="main-content">
+          {children}
+        </main>
       </div>
     </Providers>
   );

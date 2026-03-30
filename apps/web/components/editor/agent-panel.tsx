@@ -3,31 +3,50 @@
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  Loader2,
+  CheckCircle,
+  Sparkles,
+  Clock,
+  Scissors,
   CheckCheck,
   XCircle,
-  Loader2,
-  Download,
-  ChevronDown,
+  ArrowUp,
+  MessageSquare,
 } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
-import type { PipelineLogSummary } from "@/lib/store/editor";
-import { createClient } from "@/lib/supabase/client";
 import { StepCard } from "./step-card";
 
+function formatDuration(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 const containerVariants = {
-  hidden: {},
+  show: { transition: { staggerChildren: 0.04 } },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 8 },
   show: {
-    transition: { staggerChildren: 0.04 },
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.2, ease: "easeOut" as const },
   },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.2 } },
-};
-
-export function AgentPanel() {
-  const agentStatus = useEditorStore((s) => s.agentStatus);
+export function AgentPanel({
+  onSeek,
+  prompt,
+  setPrompt,
+  onSubmitPrompt,
+}: {
+  onSeek?: (time: number) => void;
+  prompt: string;
+  setPrompt: (v: string) => void;
+  onSubmitPrompt: () => void;
+}) {
+  const agentState = useEditorStore((s) => s.agentState);
   const agentMessages = useEditorStore((s) => s.agentMessages);
   const steps = useEditorStore((s) => s.steps);
   const approveAll = useEditorStore((s) => s.approveAll);
@@ -35,16 +54,11 @@ export function AgentPanel() {
   const projectId = useEditorStore((s) => s.projectId);
   const setStatus = useEditorStore((s) => s.setStatus);
   const duration = useEditorStore((s) => s.duration);
-  const status = useEditorStore((s) => s.status);
-  const pipelineLog = useEditorStore((s) => s.pipelineLog);
 
   const [isConfirming, setIsConfirming] = useState(false);
-  const [processedUrl, setProcessedUrl] = useState<string | null>(null);
-  const [logExpanded, setLogExpanded] = useState(false);
 
   const hasApproved = steps.some((s) => s.status === "approved");
 
-  // Computed values
   const totalRemoved = useMemo(
     () =>
       steps
@@ -53,13 +67,8 @@ export function AgentPanel() {
     [steps],
   );
 
+  const approvedCount = steps.filter((s) => s.status === "approved").length;
   const finalDuration = duration - totalRemoved;
-
-  function formatDuration(seconds: number) {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${String(s).padStart(2, "0")}`;
-  }
 
   async function handleConfirm() {
     const approvedSteps = steps.filter((s) => s.status === "approved");
@@ -81,9 +90,7 @@ export function AgentPanel() {
         }),
       });
       if (res.ok) {
-        const data = await res.json();
         setStatus("done");
-        setProcessedUrl(data.processed_url ?? null);
       }
     } catch {
       // Network error
@@ -92,189 +99,455 @@ export function AgentPanel() {
     }
   }
 
-  async function handleDownload() {
-    if (!processedUrl) return;
-    const supabase = createClient();
-    const { data } = await supabase.storage
-      .from("processed")
-      .createSignedUrl(processedUrl, 3600);
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, "_blank");
-    }
-  }
-
-  const isStreaming = agentStatus !== null;
-  const hasMessages = agentMessages.length > 0;
+  const isStreaming = agentState === "streaming";
   const hasSteps = steps.length > 0;
-  const showEmptyState = !isStreaming && !hasMessages && !hasSteps;
+  const hasMessages = agentMessages.length > 0;
+  const showEmpty = agentState === "idle" && !hasMessages && !hasSteps;
 
   return (
-    <div className="flex flex-col h-full bg-surface border-l border-border">
-      {/* ── Body ─────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 min-h-0">
+    <div
+      className="flex flex-col h-full"
+      style={{
+        width: 320,
+        minWidth: 320,
+        background: "var(--bg-surface)",
+        borderLeft: "1px solid var(--bg-border)",
+      }}
+    >
+      {/* Header - like Cardboard's "Director / Ready" */}
+      <div
+        style={{
+          padding: "12px 16px",
+          borderBottom: "1px solid var(--bg-border)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 13,
+            fontWeight: 700,
+            color: "var(--text-primary)",
+          }}
+        >
+          Director
+        </span>
+        <div className="flex items-center gap-2">
+          {isStreaming && (
+            <span
+              className="animate-pulse"
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "var(--accent)",
+                boxShadow: "0 0 8px var(--accent)",
+              }}
+            />
+          )}
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              color: isStreaming ? "var(--accent)" : "var(--success)",
+            }}
+          >
+            {isStreaming ? "Analysing" : "Ready"}
+          </span>
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div
+        className="flex-1 overflow-y-auto min-h-0"
+        style={{ padding: "0 12px" }}
+      >
         {/* Empty state */}
-        {showEmptyState && (
-          <div className="flex items-center justify-center h-full">
-            <p className="font-mono text-[13px] text-fg-muted text-center leading-[1.6] max-w-65">
-              Ready. Describe what you want to do with this video.
+        {showEmpty && (
+          <div
+            className="flex flex-col items-center justify-center h-full"
+            style={{ padding: "0 20px" }}
+          >
+            <div
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 14,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--bg-border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 18,
+              }}
+            >
+              <Sparkles
+                size={20}
+                strokeWidth={1.2}
+                style={{ color: "var(--accent)", opacity: 0.7 }}
+              />
+            </div>
+            <p
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 14,
+                fontWeight: 700,
+                color: "var(--text-primary)",
+                textAlign: "center",
+                lineHeight: 1.4,
+                marginBottom: 8,
+              }}
+            >
+              Ready to edit
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 12,
+                color: "var(--text-secondary)",
+                textAlign: "center",
+                lineHeight: 1.6,
+                maxWidth: 210,
+              }}
+            >
+              Describe what you want to do, or pick a quick action below.
             </p>
           </div>
         )}
 
-        {/* Streaming status messages */}
-        {hasMessages && !hasSteps && (
-          <div className="flex flex-col gap-1.5">
+        {/* Streaming messages */}
+        {hasMessages && (
+          <div className="flex flex-col gap-2" style={{ paddingTop: 12 }}>
             <AnimatePresence>
-              {agentMessages.map((msg, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center gap-2"
-                >
-                  {isStreaming && i === agentMessages.length - 1 ? (
-                    <span className="w-1.5 h-1.5 rounded-full bg-info animate-pulse shrink-0" />
-                  ) : (
-                    <span className="w-1.5 h-1.5 shrink-0" />
-                  )}
-                  <span className="font-mono text-[12px] text-fg-secondary">
-                    {msg}
-                  </span>
-                </motion.div>
-              ))}
+              {agentMessages.map((msg, i) => {
+                const isCurrent = isStreaming && i === agentMessages.length - 1;
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-start gap-2.5"
+                    style={{ padding: "2px 0" }}
+                  >
+                    {isCurrent ? (
+                      <span
+                        className="animate-pulse"
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: "var(--accent)",
+                          boxShadow: "0 0 6px var(--accent)",
+                          flexShrink: 0,
+                          marginTop: 5,
+                        }}
+                      />
+                    ) : (
+                      <CheckCircle
+                        size={12}
+                        strokeWidth={1.5}
+                        style={{
+                          color: "var(--success)",
+                          flexShrink: 0,
+                          marginTop: 3,
+                        }}
+                      />
+                    )}
+                    <span
+                      style={{
+                        fontFamily: "var(--font-body)",
+                        fontSize: 12,
+                        color: isCurrent
+                          ? "var(--text-primary)"
+                          : "var(--text-secondary)",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {msg}
+                    </span>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
         )}
 
-        {/* Steps list */}
+        {/* Summary bar + cut list */}
         {hasSteps && (
           <>
-            {/* Summary bar */}
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <span className="font-mono text-[12px] text-fg-secondary">
-                {steps.length} cuts · {totalRemoved.toFixed(1)}s removed ·
-                Final: {formatDuration(finalDuration)}
-              </span>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={rejectAll}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-display font-medium rounded border border-border text-fg-muted hover:text-danger hover:border-danger/30 transition-colors"
-                >
-                  <XCircle size={10} strokeWidth={1.5} />
-                  All
-                </button>
+            <div
+              style={{
+                background: "var(--bg-elevated)",
+                borderRadius: 8,
+                padding: "10px 12px",
+                margin: "10px 0 8px",
+                border: "1px solid var(--bg-border)",
+              }}
+            >
+              <div
+                className="flex items-center gap-3"
+                style={{ marginBottom: 8 }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Clock
+                    size={11}
+                    strokeWidth={1.5}
+                    style={{ color: "var(--accent)" }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {totalRemoved.toFixed(1)}s
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 10,
+                      color: "var(--text-muted)",
+                    }}
+                  >
+                    removed
+                  </span>
+                </div>
+                <div
+                  style={{
+                    width: 1,
+                    height: 10,
+                    background: "var(--bg-border)",
+                  }}
+                />
+                <div className="flex items-center gap-1.5">
+                  <Scissors
+                    size={11}
+                    strokeWidth={1.5}
+                    style={{ color: "var(--text-muted)" }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 10,
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    {approvedCount} cuts
+                  </span>
+                </div>
+              </div>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  color: "var(--text-muted)",
+                  marginBottom: 10,
+                }}
+              >
+                {formatDuration(duration)} &rarr;{" "}
+                {formatDuration(finalDuration)}
+              </div>
+              <div className="flex items-center gap-2">
                 <button
                   onClick={approveAll}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-display font-medium rounded border border-border text-fg-muted hover:text-success hover:border-success/30 transition-colors"
+                  className="flex items-center gap-1.5"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    color: "var(--success)",
+                    background: "rgba(62,207,142,.08)",
+                    border: "1px solid rgba(62,207,142,.15)",
+                    borderRadius: 5,
+                    padding: "4px 8px",
+                    cursor: "pointer",
+                    transition: "all 150ms ease",
+                  }}
                 >
-                  <CheckCheck size={10} strokeWidth={1.5} />
-                  All
+                  <CheckCheck size={11} strokeWidth={1.5} />
+                  Accept all
+                </button>
+                <button
+                  onClick={rejectAll}
+                  className="flex items-center gap-1.5"
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    color: "var(--text-muted)",
+                    background: "transparent",
+                    border: "1px solid var(--bg-border)",
+                    borderRadius: 5,
+                    padding: "4px 8px",
+                    cursor: "pointer",
+                    transition: "all 150ms ease",
+                  }}
+                >
+                  <XCircle size={11} strokeWidth={1.5} />
+                  Reject all
                 </button>
               </div>
             </div>
-
-            {/* Streaming messages above steps */}
-            {hasMessages && (
-              <div className="flex flex-col gap-1 mb-3">
-                {agentMessages.map((msg, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] text-fg-muted">
-                      {msg}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
 
             <motion.div
               variants={containerVariants}
               initial="hidden"
               animate="show"
-              className="flex flex-col gap-1"
+              className="flex flex-col"
+              style={{ gap: 4, paddingBottom: 8 }}
             >
               <AnimatePresence>
-                {steps.map((step, i) => (
-                  <motion.div key={step.id} variants={itemVariants}>
-                    <StepCard step={step} index={i} />
+                {steps.map((step) => (
+                  <motion.div key={step.id} variants={cardVariants}>
+                    <StepCard step={step} onSeek={onSeek} />
                   </motion.div>
                 ))}
               </AnimatePresence>
             </motion.div>
           </>
         )}
-
-        {/* Pipeline log summary */}
-        {pipelineLog && hasSteps && (
-          <div className="mt-3 border border-border rounded-md overflow-hidden">
-            <button
-              onClick={() => setLogExpanded((v) => !v)}
-              className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-display font-medium text-fg-muted hover:text-fg-secondary transition-colors"
-            >
-              <span>Pipeline log · {pipelineLog.entry_count} decisions</span>
-              <ChevronDown
-                size={12}
-                strokeWidth={1.5}
-                className={`transition-transform ${logExpanded ? "rotate-180" : ""}`}
-              />
-            </button>
-            {logExpanded && (
-              <div className="px-3 pb-2.5 flex flex-col gap-1">
-                {Object.entries(pipelineLog.counts).map(([key, count]) => {
-                  const [phase, action] = key.split(".");
-                  return (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between font-mono text-[10px] text-fg-muted"
-                    >
-                      <span>
-                        <span className="text-fg-secondary">{phase}</span>
-                        <span className="mx-1">·</span>
-                        {action}
-                      </span>
-                      <span className="tabular-nums">{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* ── Footer: Confirm button ───────────────────────── */}
+      {/* Confirm edits button */}
       {hasSteps && (
-        <div className="shrink-0 px-4 py-3 border-t border-border">
-          {status === "done" && processedUrl ? (
-            <button
-              onClick={handleDownload}
-              className="w-full py-2.5 bg-fg text-[#080809] font-display text-[12px] font-semibold tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all inline-flex items-center justify-center gap-1.5"
-            >
-              <Download size={14} strokeWidth={1.5} />
-              Download processed video
-            </button>
-          ) : (
-            <button
-              onClick={handleConfirm}
-              disabled={!hasApproved || isConfirming}
-              className="w-full py-2.5 bg-fg text-[#080809] font-display text-[12px] font-semibold tracking-[0.02em] rounded-md hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-            >
-              {isConfirming ? (
-                <>
-                  <Loader2
-                    size={14}
-                    strokeWidth={1.5}
-                    className="animate-spin"
-                  />
-                  Processing…
-                </>
-              ) : (
-                "Confirm edits"
-              )}
-            </button>
-          )}
+        <div
+          style={{
+            padding: "8px 12px",
+            borderTop: "1px solid var(--bg-border)",
+          }}
+        >
+          <button
+            onClick={handleConfirm}
+            disabled={!hasApproved || isConfirming}
+            style={{
+              width: "100%",
+              background: hasApproved
+                ? "linear-gradient(135deg, var(--accent-from), var(--accent-to))"
+                : "var(--bg-elevated)",
+              color: hasApproved ? "#fff" : "var(--text-muted)",
+              fontFamily: "var(--font-display)",
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: "0.02em",
+              padding: "10px 0",
+              borderRadius: 8,
+              textAlign: "center",
+              cursor: hasApproved && !isConfirming ? "pointer" : "not-allowed",
+              border: hasApproved ? "none" : "1px solid var(--bg-border)",
+              opacity: hasApproved ? 1 : 0.5,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              boxShadow: hasApproved ? "0 0 20px rgba(255,106,82,.2)" : "none",
+              transition: "all 150ms ease",
+            }}
+          >
+            {isConfirming ? (
+              <>
+                <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
+                Processing...
+              </>
+            ) : (
+              "Confirm edits"
+            )}
+          </button>
         </div>
       )}
+
+      {/* ---- Prompt input area (pinned bottom, like Cardboard) ---- */}
+      <div
+        style={{
+          padding: "10px 12px 12px",
+          borderTop: "1px solid var(--bg-border)",
+        }}
+      >
+        {/* Quick actions */}
+        {showEmpty && (
+          <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+            <button
+              onClick={() =>
+                setPrompt("Remove all silent parts from this video")
+              }
+              disabled={isStreaming}
+              className="editor-pill"
+              style={{ flex: 1 }}
+            >
+              <Scissors size={11} strokeWidth={1.5} />
+              Silence
+            </button>
+            <button
+              onClick={() => setPrompt("Add captions to this video")}
+              disabled={isStreaming}
+              className="editor-pill"
+              style={{ flex: 1 }}
+            >
+              <MessageSquare size={11} strokeWidth={1.5} />
+              Captions
+            </button>
+          </div>
+        )}
+
+        {/* Input + send */}
+        <div className="relative">
+          <input
+            type="text"
+            value={isStreaming ? "Analysing..." : prompt}
+            onChange={(e) => !isStreaming && setPrompt(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onSubmitPrompt();
+              }
+            }}
+            disabled={isStreaming}
+            placeholder="What do you want to do?"
+            className="editor-input"
+            style={{
+              width: "100%",
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--bg-border)",
+              borderRadius: 10,
+              height: 40,
+              padding: "0 40px 0 14px",
+              fontFamily: "var(--font-body)",
+              fontSize: 13,
+              color: isStreaming ? "var(--text-muted)" : "var(--text-primary)",
+              outline: "none",
+              transition: "border-color 150ms ease, box-shadow 150ms ease",
+            }}
+          />
+          <button
+            onClick={onSubmitPrompt}
+            disabled={!prompt.trim() || isStreaming}
+            style={{
+              position: "absolute",
+              right: 6,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 28,
+              height: 28,
+              borderRadius: 8,
+              border: "none",
+              background:
+                prompt.trim() && !isStreaming ? "var(--accent)" : "transparent",
+              color:
+                prompt.trim() && !isStreaming ? "#fff" : "var(--text-muted)",
+              cursor: prompt.trim() && !isStreaming ? "pointer" : "default",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 150ms ease",
+              opacity: prompt.trim() && !isStreaming ? 1 : 0.3,
+            }}
+          >
+            <ArrowUp size={14} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

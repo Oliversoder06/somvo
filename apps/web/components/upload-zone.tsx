@@ -6,13 +6,12 @@ import { Upload, Loader2, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { extractThumbnail } from "@/lib/ffmpeg/thumbnail";
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
+const MAX_FILE_SIZE = 500 * 1024 * 1024;
 const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 
 type UploadState =
   | { phase: "idle" }
   | { phase: "uploading"; filename: string; progress: number }
-  | { phase: "processing"; filename: string; projectId: string }
   | { phase: "error"; message: string };
 
 function extFromMime(mime: string) {
@@ -29,7 +28,6 @@ export function UploadZone() {
 
   const uploadFile = useCallback(
     async (file: File) => {
-      // --- validate ---------------------------------------------------------
       if (!ACCEPTED_TYPES.includes(file.type)) {
         setState({
           phase: "error",
@@ -46,8 +44,6 @@ export function UploadZone() {
       }
 
       const supabase = createClient();
-
-      // get current user
       const {
         data: { user },
         error: authErr,
@@ -60,7 +56,6 @@ export function UploadZone() {
         return;
       }
 
-      // --- step 3: create project row (status = uploading) ------------------
       const { data: project, error: insertErr } = await supabase
         .from("projects")
         .insert({
@@ -84,9 +79,6 @@ export function UploadZone() {
 
       setState({ phase: "uploading", filename: file.name, progress: 0 });
 
-      // --- step 2: upload file to Supabase Storage (raw bucket) -------------
-      // Note: supabase-js doesn't expose XHR progress, so we show an
-      // indeterminate bar and flip to 100 when done.
       const { error: uploadErr } = await supabase.storage
         .from("raw")
         .upload(storagePath, file, {
@@ -96,7 +88,6 @@ export function UploadZone() {
         });
 
       if (uploadErr) {
-        // clean up the project row on upload failure
         await supabase.from("projects").delete().eq("id", project.id);
         setState({ phase: "error", message: uploadErr.message });
         return;
@@ -104,7 +95,6 @@ export function UploadZone() {
 
       setState({ phase: "uploading", filename: file.name, progress: 100 });
 
-      // --- step 4: update project row → ready for user input ----------------
       const { error: updateErr } = await supabase
         .from("projects")
         .update({ raw_url: storagePath, status: "ready" as const })
@@ -115,11 +105,8 @@ export function UploadZone() {
         return;
       }
 
-      // Extract thumbnail and duration via ffmpeg.wasm
       try {
         const { thumbnailUrl, durationSeconds } = await extractThumbnail(file);
-
-        // Upload thumbnail to Supabase Storage
         if (thumbnailUrl) {
           const thumbResp = await fetch(thumbnailUrl);
           const thumbBlob = await thumbResp.blob();
@@ -131,8 +118,6 @@ export function UploadZone() {
             });
           URL.revokeObjectURL(thumbnailUrl);
         }
-
-        // Save duration to projects table
         if (durationSeconds > 0) {
           await supabase
             .from("projects")
@@ -140,16 +125,13 @@ export function UploadZone() {
             .eq("id", project.id);
         }
       } catch {
-        // Thumbnail extraction is non-critical — continue to editor
+        // Thumbnail extraction is non-critical
       }
 
-      // Navigate directly to the editor
       router.push(`/projects/${project.id}`);
     },
     [router],
   );
-
-  // --- drag & drop / click handlers --------------------------------------
 
   const handleFile = useCallback(
     (file: File | undefined) => {
@@ -181,32 +163,64 @@ export function UploadZone() {
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       handleFile(e.target.files?.[0]);
-      // reset so the same file can be re-selected
       if (inputRef.current) inputRef.current.value = "";
     },
     [handleFile],
   );
 
-  // --- render ------------------------------------------------------------
-
   if (state.phase === "uploading") {
     return (
-      <div className="rounded-xl border-[1.5px] border-border py-16 px-8 text-center">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2
-            size={32}
-            strokeWidth={1.5}
-            className="text-accent animate-spin"
+      <div
+        className="dropzone"
+        style={{
+          width: "100%",
+          maxWidth: 520,
+          background: "rgba(255,255,255,.025)",
+          border: "1.5px solid rgba(255,255,255,.1)",
+          borderRadius: 14,
+          padding: "52px 32px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Loader2
+          size={20}
+          strokeWidth={1.5}
+          className="animate-spin"
+          style={{ color: "var(--accent)" }}
+        />
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 15,
+            fontWeight: 700,
+            color: "var(--text-primary)",
+          }}
+        >
+          Uploading {state.filename}
+        </span>
+        <div
+          style={{
+            width: 200,
+            height: 4,
+            borderRadius: 2,
+            background: "var(--bg-border)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              borderRadius: 2,
+              background: "var(--accent)",
+              width: state.progress === 0 ? "60%" : "100%",
+              transition: "width 300ms ease",
+            }}
           />
-          <span className="font-display text-fg font-semibold">
-            Uploading {state.filename}…
-          </span>
-          <div className="w-48 h-1.5 rounded-full bg-border overflow-hidden">
-            <div
-              className="h-full bg-accent rounded-full transition-all duration-300"
-              style={{ width: state.progress === 0 ? "60%" : "100%" }}
-            />
-          </div>
         </div>
       </div>
     );
@@ -219,18 +233,56 @@ export function UploadZone() {
         tabIndex={0}
         onClick={() => setState({ phase: "idle" })}
         onKeyDown={(e) => e.key === "Enter" && setState({ phase: "idle" })}
-        className="rounded-xl border-[1.5px] border-red-400/40 bg-red-500/5 py-16 px-8 text-center cursor-pointer"
+        className="dropzone"
+        style={{
+          width: "100%",
+          maxWidth: 520,
+          background: "rgba(255,255,255,.025)",
+          border: "1.5px solid var(--danger)",
+          borderRadius: 14,
+          padding: "52px 32px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 12,
+          cursor: "pointer",
+          position: "relative",
+          overflow: "hidden",
+        }}
       >
-        <div className="flex flex-col items-center gap-3">
-          <AlertCircle size={32} strokeWidth={1.5} className="text-red-400" />
-          <span className="font-display text-fg font-semibold">
-            Upload failed
-          </span>
-          <span className="text-fg-secondary text-[13px]">{state.message}</span>
-          <span className="text-accent text-[13px] font-medium mt-1">
-            Click to try again
-          </span>
-        </div>
+        <AlertCircle
+          size={20}
+          strokeWidth={1.5}
+          style={{ color: "var(--danger)" }}
+        />
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 15,
+            fontWeight: 700,
+            color: "var(--text-primary)",
+          }}
+        >
+          Upload failed
+        </span>
+        <span
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: 12,
+            color: "var(--text-muted)",
+          }}
+        >
+          {state.message}
+        </span>
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            color: "var(--accent)",
+          }}
+        >
+          Click to try again
+        </span>
       </div>
     );
   }
@@ -240,15 +292,40 @@ export function UploadZone() {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`
-        block cursor-pointer rounded-xl border-[1.5px] border-dashed py-16 px-8 text-center
-        transition-[border-color,background] duration-150
-        ${
-          isDragOver
-            ? "border-fg-muted bg-elevated"
-            : "border-border hover:border-fg-muted hover:bg-elevated"
+      className="dropzone"
+      style={{
+        width: "100%",
+        maxWidth: 520,
+        background: isDragOver
+          ? "rgba(255,80,80,.03)"
+          : "rgba(255,255,255,.025)",
+        border: isDragOver
+          ? "1.5px solid rgba(255,100,75,.35)"
+          : "1.5px dashed rgba(255,255,255,.1)",
+        borderRadius: 14,
+        padding: "52px 32px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 12,
+        cursor: "pointer",
+        position: "relative",
+        overflow: "hidden",
+        transition: "border-color var(--transition-base), background var(--transition-base)",
+      }}
+      onMouseEnter={(e) => {
+        if (!isDragOver) {
+          e.currentTarget.style.borderColor = "rgba(255,100,75,.35)";
+          e.currentTarget.style.background = "rgba(255,80,80,.03)";
         }
-      `}
+      }}
+      onMouseLeave={(e) => {
+        if (!isDragOver) {
+          e.currentTarget.style.borderColor = "rgba(255,255,255,.1)";
+          e.currentTarget.style.background = "rgba(255,255,255,.025)";
+          e.currentTarget.style.borderStyle = "dashed";
+        }
+      }}
     >
       <input
         ref={inputRef}
@@ -257,15 +334,57 @@ export function UploadZone() {
         className="hidden"
         onChange={handleChange}
       />
-      <div className="flex flex-col items-center gap-3">
-        <Upload size={32} strokeWidth={1.5} className="text-fg-muted" />
-        <span className="font-display text-fg font-semibold">
-          Drop your video here
-        </span>
-        <span className="text-fg-secondary text-[13px]">
-          MP4, MOV, or WebM — up to 500 MB
-        </span>
-      </div>
+      <Upload size={20} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
+      <span
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 15,
+          fontWeight: 700,
+          color: "var(--text-primary)",
+        }}
+      >
+        Drop your video here
+      </span>
+      <span
+        style={{
+          fontFamily: "var(--font-body)",
+          fontSize: 12,
+          color: "var(--text-muted)",
+        }}
+      >
+        Drag and drop to get started
+      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          inputRef.current?.click();
+        }}
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--text-secondary)",
+          border: "1px solid var(--bg-border)",
+          borderRadius: 7,
+          padding: "7px 18px",
+          background: "var(--bg-elevated)",
+          cursor: "pointer",
+        }}
+      >
+        Browse files
+      </button>
+      <span
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: "var(--text-muted)",
+        }}
+      >
+        MP4 &middot; MOV &middot; WebM &middot; up to 500 MB
+      </span>
     </label>
   );
 }

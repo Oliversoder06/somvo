@@ -14,84 +14,117 @@ function formatTimestamp(seconds: number) {
 const TYPE_LABELS: Record<string, string> = {
   cut_silence: "CUT SILENCE",
   cut_filler: "CUT FILLER",
-  shorten: "SHORTEN",
-  split: "SPLIT",
-  trim: "TRIM",
   caption: "CAPTION",
 };
 
-export function StepCard({ step, index }: { step: EditStep; index: number }) {
+export function StepCard({
+  step,
+  onSeek,
+}: {
+  step: EditStep;
+  onSeek?: (time: number) => void;
+}) {
   const approveStep = useEditorStore((s) => s.approveStep);
   const rejectStep = useEditorStore((s) => s.rejectStep);
 
   const isApproved = step.status === "approved";
   const isRejected = step.status === "rejected";
-  const timeDiff = (step.endTime - step.startTime).toFixed(1);
+  const dur = (step.endTime - step.startTime).toFixed(1);
+
+  const borderColor = isApproved
+    ? "var(--success)"
+    : isRejected
+      ? "var(--danger)"
+      : "var(--bg-border)";
 
   return (
     <div
-      className={`
-        border-l-[3px] rounded-r-md px-3 py-2.5 transition-all
-        ${isApproved ? "border-l-success bg-(--success)/3" : ""}
-        ${isRejected ? "border-l-danger opacity-40" : ""}
-        ${!isApproved && !isRejected ? "border-l-border" : ""}
-      `}
+      onClick={() => onSeek?.(Math.max(0, step.startTime - 0.5))}
+      style={{
+        background: "var(--bg-elevated)",
+        borderRadius: 7,
+        padding: "9px 10px",
+        borderLeft: `2px solid ${borderColor}`,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 9,
+        opacity: isRejected ? 0.35 : 1,
+        transition: "all 150ms ease",
+        border: `1px solid ${isApproved ? "rgba(62,207,142,.15)" : isRejected ? "rgba(229,72,77,.1)" : "var(--bg-border)"}`,
+        borderLeftWidth: 2,
+        borderLeftColor: borderColor,
+      }}
     >
-      {/* Top row: index, type, timestamp */}
-      <div className="flex items-center gap-2 mb-1">
-        <span className="font-mono text-[11px] text-fg-muted w-5 shrink-0">
-          {String(index + 1).padStart(2, "0")}
-        </span>
-        <span className="font-display text-[12px] font-semibold tracking-[0.06em] text-fg">
+      {/* Checkbox */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isApproved) rejectStep(step.id);
+          else approveStep(step.id);
+        }}
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: 3,
+          border: `1px solid ${isApproved ? "var(--success)" : isRejected ? "var(--danger)" : "var(--bg-border)"}`,
+          background: isApproved
+            ? "var(--success)"
+            : isRejected
+              ? "transparent"
+              : "transparent",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          marginTop: 1,
+          cursor: "pointer",
+        }}
+      >
+        {isApproved && (
+          <Check
+            size={10}
+            strokeWidth={2}
+            style={{ color: "var(--bg-base)" }}
+          />
+        )}
+        {isRejected && (
+          <X size={10} strokeWidth={2} style={{ color: "var(--danger)" }} />
+        )}
+      </button>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            color: "var(--text-primary)",
+          }}
+        >
           {TYPE_LABELS[step.type] ?? step.type.toUpperCase()}
         </span>
-        <span className="font-mono text-[11px] text-fg-muted ml-auto tabular-nums">
-          {formatTimestamp(step.startTime)} – {formatTimestamp(step.endTime)}
-        </span>
-      </div>
-
-      {/* Reason */}
-      <p className="text-[12px] text-fg-secondary leading-[1.6] mb-2.5 pl-7">
-        {step.reason}
-        {step.confidence != null && (
-          <span className="ml-1.5 text-fg-muted font-mono text-[10px]">
-            score {step.confidence}
-          </span>
-        )}
-      </p>
-
-      {/* Action buttons */}
-      <div className="flex items-center justify-end gap-1.5 pl-7">
-        <button
-          onClick={() => rejectStep(step.id)}
-          className={`
-            inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-display font-medium
-            rounded-md border transition-colors
-            ${
-              isRejected
-                ? "border-danger/50 text-danger bg-(--danger)/8"
-                : "border-border text-fg-muted hover:text-fg-secondary hover:border-fg-muted"
-            }
-          `}
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            color: "var(--text-secondary)",
+          }}
         >
-          <X size={11} strokeWidth={1.5} />
-          Reject
-        </button>
-        <button
-          onClick={() => approveStep(step.id)}
-          className={`
-            inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-display font-medium
-            rounded-md border transition-colors
-            ${
-              isApproved
-                ? "border-success/50 text-success bg-(--success)/8"
-                : "border-border text-fg-muted hover:text-fg-secondary hover:border-fg-muted"
-            }
-          `}
+          {formatTimestamp(step.startTime)} &ndash;{" "}
+          {formatTimestamp(step.endTime)}
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 9,
+            color: "var(--text-muted)",
+          }}
         >
-          <Check size={11} strokeWidth={1.5} />
-          Keep
-        </button>
+          {dur}s
+        </div>
       </div>
     </div>
   );

@@ -1,128 +1,80 @@
 import { create } from "zustand";
 
-export type ProjectStatus =
-  | "uploading"
-  | "processing"
-  | "ready"
-  | "done"
-  | "failed";
+export type StepStatus = "pending" | "approved" | "rejected";
 
 export type EditStep = {
   id: string;
-  type: "cut_silence" | "cut_filler" | "shorten" | "split" | "trim" | "caption";
+  type: "cut_silence" | "cut_filler" | "caption";
   reason: string;
   startTime: number;
   endTime: number;
-  confidence?: number | null;
-  status: "pending" | "approved" | "rejected";
+  status: StepStatus;
 };
 
-export type PipelineLogSummary = {
-  entry_count: number;
-  counts: Record<string, number>;
-};
+export type AgentState = "idle" | "streaming" | "done" | "failed";
 
-interface EditorState {
-  // Project
+interface EditorStore {
   projectId: string | null;
   projectName: string;
-  status: ProjectStatus;
+  status: "uploading" | "processing" | "ready" | "done" | "failed";
   videoUrl: string | null;
   duration: number;
-
-  // Agent
-  agentStatus: string | null;
-  agentMessages: string[];
-
-  // Steps
-  steps: EditStep[];
-
-  // Pipeline log
-  pipelineLog: PipelineLogSummary | null;
-
-  // Playback
   currentTime: number;
   isPlaying: boolean;
   previewMode: boolean;
 
-  // Project setters
+  agentState: AgentState;
+  agentMessages: string[];
+  steps: EditStep[];
+
   setProjectId: (id: string) => void;
   setProjectName: (name: string) => void;
-  setStatus: (status: ProjectStatus) => void;
-  setVideoUrl: (url: string | null) => void;
-  setDuration: (duration: number) => void;
-
-  // Agent setters
-  setAgentStatus: (message: string | null) => void;
-  addAgentMessage: (message: string) => void;
-  clearAgent: () => void;
-
-  // Step actions
+  setStatus: (s: EditorStore["status"]) => void;
+  setVideoUrl: (url: string) => void;
+  setDuration: (d: number) => void;
+  setCurrentTime: (t: number) => void;
+  setIsPlaying: (p: boolean) => void;
+  setPreviewMode: (m: boolean) => void;
+  timelineZoom: number;
+  setTimelineZoom: (z: number) => void;
+  setAgentState: (s: AgentState) => void;
+  addAgentMessage: (m: string) => void;
   addStep: (step: EditStep) => void;
-  setSteps: (steps: EditStep[]) => void;
   approveStep: (id: string) => void;
   rejectStep: (id: string) => void;
-  updateStepBounds: (id: string, start: number, end: number) => void;
   approveAll: () => void;
   rejectAll: () => void;
-
-  // Log actions
-  setPipelineLog: (log: PipelineLogSummary) => void;
-
-  // Playback actions
-  setCurrentTime: (time: number) => void;
-  setIsPlaying: (playing: boolean) => void;
-  setPreviewMode: (preview: boolean) => void;
+  clearSteps: () => void;
 }
 
-export const useEditorStore = create<EditorState>((set) => ({
-  // Project
+export const useEditorStore = create<EditorStore>((set) => ({
   projectId: null,
-  projectName: "",
+  projectName: "Untitled",
   status: "ready",
   videoUrl: null,
   duration: 0,
-
-  // Agent
-  agentStatus: null,
-  agentMessages: [],
-
-  // Steps
-  steps: [],
-
-  // Pipeline log
-  pipelineLog: null,
-
-  // Playback
   currentTime: 0,
   isPlaying: false,
   previewMode: false,
+  timelineZoom: 1,
 
-  // Project setters
+  agentState: "idle",
+  agentMessages: [],
+  steps: [],
+
   setProjectId: (id) => set({ projectId: id }),
   setProjectName: (name) => set({ projectName: name }),
-  setStatus: (status) => set({ status }),
+  setStatus: (s) => set({ status: s }),
   setVideoUrl: (url) => set({ videoUrl: url }),
-  setDuration: (duration) => set({ duration }),
-
-  // Agent setters
-  setAgentStatus: (message) =>
-    set((state) => ({
-      agentStatus: message,
-      agentMessages: message
-        ? [...state.agentMessages, message]
-        : state.agentMessages,
-    })),
-  addAgentMessage: (message) =>
-    set((state) => ({
-      agentMessages: [...state.agentMessages, message],
-    })),
-  clearAgent: () =>
-    set({ agentStatus: null, agentMessages: [], steps: [], pipelineLog: null }),
-
-  // Step actions
+  setDuration: (d) => set({ duration: d }),
+  setCurrentTime: (t) => set({ currentTime: t }),
+  setIsPlaying: (p) => set({ isPlaying: p }),
+  setPreviewMode: (m) => set({ previewMode: m }),
+  setTimelineZoom: (z) => set({ timelineZoom: Math.max(1, Math.min(20, z)) }),
+  setAgentState: (s) => set({ agentState: s }),
+  addAgentMessage: (m) =>
+    set((state) => ({ agentMessages: [...state.agentMessages, m] })),
   addStep: (step) => set((state) => ({ steps: [...state.steps, step] })),
-  setSteps: (steps) => set({ steps }),
   approveStep: (id) =>
     set((state) => ({
       steps: state.steps.map((s) =>
@@ -135,12 +87,6 @@ export const useEditorStore = create<EditorState>((set) => ({
         s.id === id ? { ...s, status: "rejected" as const } : s,
       ),
     })),
-  updateStepBounds: (id, start, end) =>
-    set((state) => ({
-      steps: state.steps.map((s) =>
-        s.id === id ? { ...s, startTime: start, endTime: end } : s,
-      ),
-    })),
   approveAll: () =>
     set((state) => ({
       steps: state.steps.map((s) => ({ ...s, status: "approved" as const })),
@@ -149,12 +95,5 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => ({
       steps: state.steps.map((s) => ({ ...s, status: "rejected" as const })),
     })),
-
-  // Log actions
-  setPipelineLog: (log) => set({ pipelineLog: log }),
-
-  // Playback actions
-  setCurrentTime: (time) => set({ currentTime: time }),
-  setIsPlaying: (playing) => set({ isPlaying: playing }),
-  setPreviewMode: (preview) => set({ previewMode: preview }),
+  clearSteps: () => set({ steps: [], agentMessages: [], agentState: "idle" }),
 }));

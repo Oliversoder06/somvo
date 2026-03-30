@@ -1,185 +1,108 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import {
-  FileText,
-  Music,
-  Film,
-  Crop,
+  MousePointer2,
+  Scissors,
   Type,
-  Sparkles,
-  Link2,
-  SquareAsterisk,
+  Music,
+  Volume2,
+  Wand2,
   Settings,
-  Search,
-  Plus,
-  FolderOpen,
 } from "lucide-react";
 
-const tabs = [
-  { id: "media", icon: FileText, label: "Media" },
-  { id: "audio", icon: Music, label: "Audio" },
-  { id: "clips", icon: Film, label: "Clips" },
-  { id: "crop", icon: Crop, label: "Crop" },
-  { id: "text", icon: Type, label: "Text" },
-  { id: "effects", icon: Sparkles, label: "Effects" },
-  { id: "elements", icon: Link2, label: "Elements" },
-  { id: "ai", icon: SquareAsterisk, label: "AI" },
-];
-
-const bottomTabs = [{ id: "settings", icon: Settings, label: "Settings" }];
+const tools = [
+  { id: "select", icon: MousePointer2, label: "Select", shortcut: "V" },
+  { id: "cut", icon: Scissors, label: "Cut mode", shortcut: "C" },
+  { id: "text", icon: Type, label: "Captions" },
+  { id: "music", icon: Music, label: "Music" },
+  { id: "audio", icon: Volume2, label: "Audio" },
+  { id: "effects", icon: Wand2, label: "Effects" },
+] as const;
 
 export function EditorSidebar() {
-  const [activeTab, setActiveTab] = useState("media");
+  const [active, setActive] = useState<string>("select");
 
   return (
-    <div className="flex h-full shrink-0">
-      {/* Icon strip */}
-      <aside className="w-12 shrink-0 flex flex-col items-center py-3 gap-0.5 border-r border-border">
-        {/* Logo */}
-        <div className="mb-3">
-          <Image
-            src="/logo/somvo-mini.svg"
-            alt="Somvo"
-            width={20}
-            height={20}
-            priority
-          />
-        </div>
-
-        {/* Tab icons */}
-        <div className="flex flex-col items-center gap-0.5">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(isActive ? "" : tab.id)}
-                className={`
-                  flex items-center justify-center w-8 h-8 rounded-md transition-colors
-                  ${
-                    isActive
-                      ? "bg-elevated text-fg"
-                      : "text-fg-muted hover:text-fg-secondary hover:bg-elevated/50"
-                  }
-                `}
-                title={tab.label}
-              >
-                <tab.icon size={16} strokeWidth={1.5} />
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Bottom icons */}
-        <div className="flex flex-col items-center gap-0.5">
-          {bottomTabs.map((tab) => (
+    <div
+      className="shrink-0 flex flex-col items-center"
+      style={{
+        width: 48,
+        background: "var(--bg-surface)",
+        borderRight: "1px solid var(--bg-border)",
+        paddingTop: 12,
+        paddingBottom: 12,
+      }}
+    >
+      {/* Tool icons */}
+      <div className="flex flex-col items-center gap-1">
+        {tools.map((tool) => {
+          const Icon = tool.icon;
+          const isActive = active === tool.id;
+          return (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(activeTab === tab.id ? "" : tab.id)}
-              className={`
-                flex items-center justify-center w-8 h-8 rounded-md transition-colors
-                ${
-                  activeTab === tab.id
-                    ? "bg-elevated text-fg"
-                    : "text-fg-muted hover:text-fg-secondary hover:bg-elevated/50"
-                }
-              `}
-              title={tab.label}
+              key={tool.id}
+              onClick={() => setActive(tool.id)}
+              title={tool.label}
+              className="sidebar-tool-btn"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 8,
+                border: "none",
+                background: isActive ? "rgba(255,255,255,.08)" : "transparent",
+                color: isActive ? "var(--text-primary)" : "var(--text-muted)",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "all 120ms ease",
+                position: "relative",
+              }}
             >
-              <tab.icon size={16} strokeWidth={1.5} />
+              <Icon size={16} strokeWidth={1.5} />
+              {"shortcut" in tool && tool.shortcut && (
+                <span
+                  style={{
+                    position: "absolute",
+                    bottom: 2,
+                    right: 3,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 7,
+                    color: "var(--text-muted)",
+                    opacity: isActive ? 0.6 : 0.3,
+                  }}
+                >
+                  {tool.shortcut}
+                </span>
+              )}
             </button>
-          ))}
-        </div>
-      </aside>
+          );
+        })}
+      </div>
 
-      {/* Expandable panel */}
-      {activeTab && (
-        <div className="w-[220px] bg-surface border-r border-border flex flex-col overflow-hidden">
-          <SidebarPanel activeTab={activeTab} />
-        </div>
-      )}
+      <div className="flex-1" />
+
+      {/* Settings at bottom */}
+      <button
+        title="Settings"
+        className="sidebar-tool-btn"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 8,
+          border: "none",
+          background: "transparent",
+          color: "var(--text-muted)",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 120ms ease",
+        }}
+      >
+        <Settings size={16} strokeWidth={1.5} />
+      </button>
     </div>
-  );
-}
-
-function SidebarPanel({ activeTab }: { activeTab: string }) {
-  if (activeTab === "media") return <MediaLibraryPanel />;
-
-  const tabLabels: Record<string, string> = {
-    audio: "Audio",
-    clips: "Video Clips",
-    crop: "Crop & Resize",
-    text: "Text & Titles",
-    effects: "Effects",
-    elements: "Elements",
-    ai: "AI Tools",
-    settings: "Settings",
-  };
-
-  return (
-    <div className="flex-1 flex items-center justify-center px-4">
-      <p className="font-mono text-[11px] text-fg-muted text-center">
-        {tabLabels[activeTab] ?? activeTab}
-        <br />
-        <span className="text-[10px]">Coming soon</span>
-      </p>
-    </div>
-  );
-}
-
-function MediaLibraryPanel() {
-  return (
-    <>
-      {/* Header */}
-      <div className="px-3 py-3 flex items-start justify-between">
-        <div>
-          <h2 className="font-display text-[13px] font-semibold text-fg">
-            Media Library
-          </h2>
-          <p className="font-mono text-[10px] text-fg-muted mt-0.5">
-            Uploads &amp; Assets
-          </p>
-        </div>
-        <button className="w-7 h-7 flex items-center justify-center rounded-md text-fg-muted hover:text-fg-secondary hover:bg-elevated transition-colors">
-          <FolderOpen size={14} strokeWidth={1.5} />
-        </button>
-      </div>
-
-      {/* Search + Add */}
-      <div className="px-3 pb-2 flex items-center gap-2">
-        <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-elevated border border-border">
-          <Search
-            size={12}
-            strokeWidth={1.5}
-            className="text-fg-muted shrink-0"
-          />
-          <input
-            type="text"
-            placeholder="Search assets..."
-            className="bg-transparent text-[11px] text-fg placeholder:text-fg-muted outline-none w-full font-mono"
-          />
-        </div>
-        <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-elevated border border-border text-fg-secondary hover:text-fg hover:border-fg-muted transition-colors shrink-0">
-          <Plus size={12} strokeWidth={1.5} />
-          <span className="font-display text-[11px] font-medium">Add</span>
-        </button>
-      </div>
-
-      {/* Asset grid — placeholder thumbnails */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
-        <div className="grid grid-cols-2 gap-1.5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="aspect-video rounded-md bg-elevated border border-border"
-            />
-          ))}
-        </div>
-      </div>
-    </>
   );
 }

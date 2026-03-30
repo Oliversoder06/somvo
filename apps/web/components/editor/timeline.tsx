@@ -1,45 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { useEditorStore } from "@/lib/store/editor";
-
-function formatRulerTime(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-/* ── Skeleton shimmer for loading tracks ── */
-function FilmstripSkeleton() {
-  return (
-    <div
-      className="absolute inset-0 z-30 overflow-hidden"
-      style={{ background: "#161618" }}
-    >
-      <div className="absolute inset-0 flex gap-0.5 p-0.5">
-        {Array.from({ length: 14 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex-1 h-full rounded-[3px] relative overflow-hidden"
-            style={{ background: "#1a1a1e" }}
-          >
-            <div
-              className="absolute inset-0 skeleton-shimmer"
-              style={{ animationDelay: `${i * 100}ms` }}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function WaveformSkeleton() {
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Shimmer base */}
       <div className="absolute inset-0 skeleton-shimmer" />
-      {/* Fake waveform bars */}
       <div className="absolute inset-0 flex items-center gap-px px-0.5">
         {Array.from({ length: 200 }).map((_, i) => {
           const h =
@@ -52,103 +19,18 @@ function WaveformSkeleton() {
               className="flex-1 min-w-0 rounded-full"
               style={{
                 height: `${h}%`,
-                background: "#27272a",
+                background: "var(--waveform)",
                 opacity: 0.6 + Math.abs(Math.sin(i * 0.5)) * 0.4,
               }}
             />
           );
         })}
       </div>
-      {/* Scanning line */}
       <div className="absolute top-0 bottom-0 w-16 skeleton-scan" />
     </div>
   );
 }
 
-/* ── Video filmstrip: capture frames from <video> onto a canvas ── */
-function useFilmstrip(
-  playerRef: React.MutableRefObject<HTMLVideoElement | null>,
-  duration: number,
-  containerRef: React.RefObject<HTMLDivElement | null>,
-): boolean {
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const el = playerRef.current;
-    const container = containerRef.current;
-    if (!el || !container || duration <= 0 || !el.src) return;
-
-    setLoading(true);
-
-    const containerWidth = container.clientWidth;
-    const thumbHeight = 48;
-    const thumbWidth = 80;
-    const count = Math.min(
-      Math.max(1, Math.floor(containerWidth / thumbWidth)),
-      20,
-    );
-
-    const canvas = document.createElement("canvas");
-    canvas.width = containerWidth;
-    canvas.height = thumbHeight;
-
-    let cancelled = false;
-
-    const offscreen = document.createElement("video");
-    offscreen.crossOrigin = "anonymous";
-    offscreen.muted = true;
-    offscreen.preload = "auto";
-    offscreen.src = el.src;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    async function extractFrames() {
-      await new Promise<void>((resolve, reject) => {
-        if (offscreen.readyState >= 2) return resolve();
-        offscreen.addEventListener("loadeddata", () => resolve(), {
-          once: true,
-        });
-        offscreen.addEventListener("error", () => reject(), { once: true });
-      });
-
-      const sliceWidth = containerWidth / count;
-
-      for (let i = 0; i < count; i++) {
-        if (cancelled) return;
-        const seekTime = (i / count) * duration + duration / count / 2;
-        offscreen.currentTime = Math.min(seekTime, duration - 0.1);
-        await new Promise<void>((resolve) => {
-          offscreen.addEventListener("seeked", () => resolve(), { once: true });
-        });
-        if (cancelled) return;
-        ctx!.drawImage(offscreen, i * sliceWidth, 0, sliceWidth, thumbHeight);
-
-        // Progressive render: update background after each frame
-        if (container) {
-          container.style.backgroundImage = `url(${canvas.toDataURL("image/jpeg", 0.5)})`;
-          container.style.backgroundSize = "100% 100%";
-          container.style.backgroundRepeat = "no-repeat";
-        }
-      }
-
-      if (!cancelled) setLoading(false);
-    }
-
-    extractFrames().catch(() => {
-      if (!cancelled) setLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-      offscreen.src = "";
-    };
-  }, [playerRef, duration, containerRef]);
-
-  return loading;
-}
-
-/* ── Audio waveform via WaveSurfer.js ── */
 function useWaveform(
   playerRef: React.MutableRefObject<HTMLVideoElement | null>,
   duration: number,
@@ -173,8 +55,8 @@ function useWaveform(
         ws = WaveSurfer.create({
           container: container!,
           height: "auto",
-          waveColor: "#3f3f46",
-          progressColor: "#71717a",
+          waveColor: "var(--waveform)",
+          progressColor: "var(--waveform-act)",
           cursorWidth: 0,
           barWidth: 2,
           barGap: 1,
@@ -201,6 +83,126 @@ function useWaveform(
   return loading;
 }
 
+/**
+ * Captures a pool of thumbnail frames from the video, once.
+ * Returns an array of { time, dataUrl } sorted by time.
+ */
+function useThumbnailPool(
+  playerRef: React.MutableRefObject<HTMLVideoElement | null>,
+  duration: number,
+) {
+  const [pool, setPool] = useState<{ time: number; url: string }[]>([]);
+
+  useEffect(() => {
+    const src = playerRef.current?.src;
+    if (!src || duration <= 0) return;
+
+    // Capture one frame per ~2 seconds, capped at 80
+    const count = Math.min(80, Math.max(10, Math.ceil(duration / 2)));
+
+    let cancelled = false;
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "auto";
+    video.muted = true;
+    video.src = src;
+
+    const thumbH = 54;
+    const thumbW = Math.round(thumbH * (16 / 9));
+    const canvas = document.createElement("canvas");
+    canvas.width = thumbW * 2;
+    canvas.height = thumbH * 2;
+    const ctx = canvas.getContext("2d")!;
+
+    const frames: { time: number; url: string }[] = [];
+    let idx = 0;
+
+    const captureFrame = () => {
+      if (cancelled) return;
+      const t = (idx / count) * duration;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      frames.push({ time: t, url: canvas.toDataURL("image/jpeg", 0.5) });
+      idx++;
+      if (idx < count) {
+        video.currentTime = (idx / count) * duration;
+      } else {
+        setPool([...frames]);
+        video.removeAttribute("src");
+        video.load();
+      }
+    };
+
+    video.addEventListener("seeked", captureFrame);
+    video.addEventListener("loadeddata", () => {
+      if (cancelled) return;
+      video.currentTime = 0;
+    });
+
+    return () => {
+      cancelled = true;
+      video.removeEventListener("seeked", captureFrame);
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [playerRef, duration]);
+
+  return pool;
+}
+
+/** Fixed-width thumbnail tile size */
+const THUMB_TILE_W = 96;
+
+/**
+ * Given the pool of captured frames, the zoom, viewport width, scroll position
+ * and duration, compute which fixed-width tiles to render and which pool frame
+ * each tile should show. Only tiles visible in the viewport are returned.
+ */
+function useVisibleTiles(
+  pool: { time: number; url: string }[],
+  duration: number,
+  zoom: number,
+  scrollLeft: number,
+  viewportWidth: number,
+) {
+  return useMemo(() => {
+    if (pool.length === 0 || duration <= 0 || viewportWidth <= 0) return [];
+
+    const totalWidth = viewportWidth * zoom;
+    const totalTiles = Math.ceil(totalWidth / THUMB_TILE_W);
+    const secPerTile = duration / totalTiles;
+
+    // Only render tiles visible in the scroll viewport (+ 1 tile buffer each side)
+    const firstVisible = Math.max(0, Math.floor(scrollLeft / THUMB_TILE_W) - 1);
+    const lastVisible = Math.min(
+      totalTiles - 1,
+      Math.ceil((scrollLeft + viewportWidth) / THUMB_TILE_W) + 1,
+    );
+
+    const tiles: { index: number; left: number; url: string }[] = [];
+    for (let i = firstVisible; i <= lastVisible; i++) {
+      const tileTime = (i + 0.5) * secPerTile; // midpoint time of this tile
+      // Find nearest pool frame
+      let best = pool[0];
+      let bestDist = Math.abs(pool[0].time - tileTime);
+      for (let j = 1; j < pool.length; j++) {
+        const d = Math.abs(pool[j].time - tileTime);
+        if (d < bestDist) {
+          best = pool[j];
+          bestDist = d;
+        }
+      }
+      tiles.push({ index: i, left: i * THUMB_TILE_W, url: best.url });
+    }
+    return tiles;
+  }, [pool, duration, zoom, scrollLeft, viewportWidth]);
+}
+
+function formatRulerTime(seconds: number) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 export function Timeline({
   playerRef,
 }: {
@@ -209,22 +211,79 @@ export function Timeline({
   const steps = useEditorStore((s) => s.steps);
   const duration = useEditorStore((s) => s.duration);
   const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
-  const updateStepBounds = useEditorStore((s) => s.updateStepBounds);
+  const zoom = useEditorStore((s) => s.timelineZoom);
+  const setZoom = useEditorStore((s) => s.setTimelineZoom);
 
   const waveformRef = useRef<HTMLDivElement>(null);
-  const filmstripRef = useRef<HTMLDivElement>(null);
-  const videoPlayheadRef = useRef<HTMLDivElement>(null);
-  const audioPlayheadRef = useRef<HTMLDivElement>(null);
+  const playheadRef = useRef<HTMLDivElement>(null);
+  const rulerPlayheadRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rulerScrollRef = useRef<HTMLDivElement>(null);
 
-  // Smooth playhead: read video.currentTime at ~60fps via rAF
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(0);
+
+  const waveformLoading = useWaveform(playerRef, duration, waveformRef);
+  const thumbPool = useThumbnailPool(playerRef, duration);
+  const visibleTiles = useVisibleTiles(
+    thumbPool,
+    duration,
+    zoom,
+    scrollLeft,
+    viewportWidth,
+  );
+
+  // Measure the scroll container viewport width
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setViewportWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    setViewportWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  // Timecode ruler marks - adapt density to zoom
+  const rulerMarks = useMemo(() => {
+    if (duration <= 0) return [];
+    // At higher zoom, show finer intervals
+    const baseInterval =
+      duration <= 30 ? 5 : duration <= 120 ? 15 : duration <= 300 ? 30 : 60;
+    const interval = Math.max(1, Math.round(baseInterval / zoom));
+    const marks: { time: number; pct: number }[] = [];
+    for (let t = 0; t <= duration; t += interval) {
+      marks.push({ time: t, pct: (t / duration) * 100 });
+    }
+    return marks;
+  }, [duration, zoom]);
+
+  // Smooth playhead via rAF + auto-scroll
   useEffect(() => {
     let rafId: number;
     const tick = () => {
       const el = playerRef.current;
       if (el && duration > 0) {
         const pct = `${(el.currentTime / duration) * 100}%`;
-        if (videoPlayheadRef.current) videoPlayheadRef.current.style.left = pct;
-        if (audioPlayheadRef.current) audioPlayheadRef.current.style.left = pct;
+        if (playheadRef.current) playheadRef.current.style.left = pct;
+        if (rulerPlayheadRef.current) rulerPlayheadRef.current.style.left = pct;
+
+        // Auto-scroll to keep playhead visible during playback
+        if (el.paused === false && scrollRef.current) {
+          const container = scrollRef.current;
+          const scrollWidth = container.scrollWidth;
+          const clientWidth = container.clientWidth;
+          const playheadX = (el.currentTime / duration) * scrollWidth;
+          const viewLeft = container.scrollLeft;
+          const viewRight = viewLeft + clientWidth;
+          // If playhead is near edge or past the visible area, center it
+          if (playheadX < viewLeft + 40 || playheadX > viewRight - 40) {
+            container.scrollLeft = playheadX - clientWidth / 2;
+          }
+        }
       }
       rafId = requestAnimationFrame(tick);
     };
@@ -232,328 +291,332 @@ export function Timeline({
     return () => cancelAnimationFrame(rafId);
   }, [playerRef, duration]);
 
-  const [dragState, setDragState] = useState<{
-    stepId: string;
-    edge: "left" | "right";
-  } | null>(null);
-  const [tooltip, setTooltip] = useState<{
-    x: number;
-    y: number;
-    text: string;
-  } | null>(null);
-
-  const filmstripLoading = useFilmstrip(playerRef, duration, filmstripRef);
-  const waveformLoading = useWaveform(playerRef, duration, waveformRef);
-
-  const rulerTicks = useMemo(() => {
-    if (duration <= 0) return [];
-    const interval = duration <= 30 ? 5 : duration <= 120 ? 15 : 30;
-    const ticks: { time: number; label: string; percent: number }[] = [];
-    for (let t = 0; t <= duration; t += interval) {
-      ticks.push({
-        time: t,
-        label: formatRulerTime(t),
-        percent: (t / duration) * 100,
-      });
+  // Sync ruler scroll with tracks scroll + track scrollLeft for virtualization
+  const handleTracksScroll = useCallback(() => {
+    if (scrollRef.current) {
+      setScrollLeft(scrollRef.current.scrollLeft);
+      if (rulerScrollRef.current) {
+        rulerScrollRef.current.scrollLeft = scrollRef.current.scrollLeft;
+      }
     }
-    return ticks;
-  }, [duration]);
+  }, []);
+
+  // Ctrl+wheel = zoom, plain wheel = horizontal scroll
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.5 : 0.5;
+        const newZoom = Math.max(1, Math.min(20, zoom + delta));
+        // Zoom towards the cursor position
+        const rect = el.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const scrollFraction = (el.scrollLeft + mouseX) / el.scrollWidth;
+        setZoom(newZoom);
+        // After React re-renders with new zoom, adjust scroll
+        requestAnimationFrame(() => {
+          el.scrollLeft = scrollFraction * el.scrollWidth - mouseX;
+        });
+      } else if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        // Convert vertical scroll to horizontal
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [zoom, setZoom]);
 
   const handleTimelineClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (duration <= 0 || dragState) return;
+      if (duration <= 0) return;
       const rect = e.currentTarget.getBoundingClientRect();
       const pct = (e.clientX - rect.left) / rect.width;
       const newTime = Math.max(0, Math.min(duration, pct * duration));
       if (playerRef.current) playerRef.current.currentTime = newTime;
       setCurrentTime(newTime);
     },
-    [duration, playerRef, setCurrentTime, dragState],
+    [duration, playerRef, setCurrentTime],
   );
 
-  const handleSegmentClick = useCallback(
-    (e: React.MouseEvent, step: (typeof steps)[0]) => {
-      e.stopPropagation();
-      const el = playerRef.current;
-      if (!el) return;
-      const seekTo = step.startTime;
-      el.currentTime = seekTo;
-      setCurrentTime(seekTo);
-      el.play().catch(() => {});
-      const endAt = step.endTime;
-      let rafId: number;
-      const checkPause = () => {
-        if (el.paused || el.currentTime >= endAt) {
-          el.pause();
-          el.currentTime = endAt;
-          return;
-        }
-        rafId = requestAnimationFrame(checkPause);
-      };
-      rafId = requestAnimationFrame(checkPause);
-    },
-    [playerRef, setCurrentTime],
-  );
-
-  const handleDragStart = useCallback(
-    (e: React.MouseEvent, stepId: string, edge: "left" | "right") => {
-      e.stopPropagation();
-      e.preventDefault();
-      setDragState({ stepId, edge });
-
-      const trackEl = e.currentTarget.closest(
-        "[data-timeline-track]",
-      ) as HTMLElement;
-      if (!trackEl) return;
-
-      const onMouseMove = (ev: MouseEvent) => {
-        const rect = trackEl.getBoundingClientRect();
-        const pct = (ev.clientX - rect.left) / rect.width;
-        const time = Math.max(0, Math.min(duration, pct * duration));
-        const step = useEditorStore
-          .getState()
-          .steps.find((s) => s.id === stepId);
-        if (!step) return;
-
-        if (edge === "left") {
-          updateStepBounds(
-            stepId,
-            Math.min(time, step.endTime - 0.1),
-            step.endTime,
-          );
-        } else {
-          updateStepBounds(
-            stepId,
-            step.startTime,
-            Math.max(time, step.startTime + 0.1),
-          );
-        }
-      };
-
-      const onMouseUp = () => {
-        setDragState(null);
-        window.removeEventListener("mousemove", onMouseMove);
-        window.removeEventListener("mouseup", onMouseUp);
-      };
-
-      window.addEventListener("mousemove", onMouseMove);
-      window.addEventListener("mouseup", onMouseUp);
-    },
-    [duration, updateStepBounds],
-  );
-
-  /* ── Cut regions on tracks: dimmed overlay so cut section looks "removed" ── */
-  const renderTrackCutRegions = () =>
+  const renderCutRegions = () =>
     steps.map((step) => {
-      if (duration <= 0) return null;
-      const leftPct = (step.startTime / duration) * 100;
-      const widthPct = ((step.endTime - step.startTime) / duration) * 100;
-      const isRejected = step.status === "rejected";
-      const isApproved = step.status === "approved";
-
-      // Rejected = skip rendering, approved = darkened, pending = lightly darkened
-      if (isRejected) return null;
-
+      if (duration <= 0 || step.status !== "approved") return null;
+      const left = (step.startTime / duration) * 100;
+      const width = ((step.endTime - step.startTime) / duration) * 100;
       return (
         <div
           key={`region-${step.id}`}
           className="absolute top-0 bottom-0 z-10 pointer-events-none"
           style={{
-            left: `${leftPct}%`,
-            width: `${widthPct}%`,
-            background: isApproved
-              ? "rgba(0, 0, 0, 0.55)"
-              : "rgba(0, 0, 0, 0.35)",
+            left: `${left}%`,
+            width: `${width}%`,
+            background: "var(--cut-region)",
+            borderLeft: "1px solid var(--cut-border)",
+            borderRight: "1px solid var(--cut-border)",
           }}
-        >
-          {/* Left edge accent */}
-          <div
-            className="absolute left-0 top-0 bottom-0 w-px"
-            style={{
-              background: "var(--danger)",
-              opacity: isApproved ? 0.8 : 0.4,
-            }}
-          />
-          {/* Right edge accent */}
-          <div
-            className="absolute right-0 top-0 bottom-0 w-px"
-            style={{
-              background: "var(--danger)",
-              opacity: isApproved ? 0.8 : 0.4,
-            }}
-          />
-        </div>
+        />
       );
     });
 
+  const approvedCuts = steps.filter((s) => s.status === "approved").length;
+  const zoomWidth = `${zoom * 100}%`;
+
   return (
     <div
-      className="flex flex-col bg-surface border-t border-border"
-      style={{ height: 210 }}
+      className="shrink-0 flex flex-col"
+      style={{
+        height: 160,
+        background: "var(--timeline-bg)",
+        borderTop: "1px solid var(--bg-border)",
+      }}
     >
-      {/* ── Timecode ruler ───────────────────────────────── */}
-      <div className="flex items-stretch h-5 shrink-0 border-b border-border relative">
-        <div className="shrink-0 w-14 border-r border-border" />
-        <div
-          className="flex-1 relative cursor-pointer"
-          onClick={handleTimelineClick}
-        >
-          {rulerTicks.map((tick) => (
-            <span
-              key={tick.time}
-              className="absolute top-1/2 -translate-y-1/2 font-mono text-[10px] text-fg-muted select-none"
-              style={{ left: `${tick.percent}%` }}
-            >
-              {tick.label}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Cut marker lane ──────────────────────────────── */}
-      {steps.length > 0 && (
-        <div
-          className="flex items-stretch shrink-0 border-b border-border"
-          style={{ height: 22 }}
-        >
-          <div className="shrink-0 flex items-center justify-center w-14 border-r border-border">
-            <span className="font-mono text-[9px] text-fg-muted">Cuts</span>
-          </div>
-          <div
-            className="flex-1 min-w-0 relative cursor-pointer"
-            data-timeline-track
-            onClick={handleTimelineClick}
-          >
-            {steps.map((step) => {
-              if (duration <= 0) return null;
-              const left = (step.startTime / duration) * 100;
-              const width = ((step.endTime - step.startTime) / duration) * 100;
-              const dur = (step.endTime - step.startTime).toFixed(1);
-              const isRejected = step.status === "rejected";
-              const isApproved = step.status === "approved";
-
-              return (
-                <div
-                  key={`marker-${step.id}`}
-                  className="absolute top-1 bottom-1 z-10 rounded-sm flex items-center justify-center overflow-hidden cursor-pointer"
-                  style={{
-                    left: `${left}%`,
-                    width: `${Math.max(width, 0.3)}%`,
-                    background: isRejected
-                      ? "#27272a"
-                      : isApproved
-                        ? "var(--danger)"
-                        : "#e5484d33",
-                    border: `1px solid ${isRejected ? "#3f3f46" : isApproved ? "var(--danger)" : "#e5484d66"}`,
-                  }}
-                  onClick={(e) => handleSegmentClick(e, step)}
-                  onMouseEnter={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const reasonLabel =
-                      step.reason || step.type.replace(/_/g, " ");
-                    setTooltip({
-                      x: rect.left + rect.width / 2,
-                      y: rect.top - 6,
-                      text: `✂ Cut ${dur}s · ${reasonLabel}`,
-                    });
-                  }}
-                  onMouseLeave={() => setTooltip(null)}
-                >
-                  {/* Drag handles */}
-                  <div
-                    className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-20"
-                    onMouseDown={(e) => handleDragStart(e, step.id, "left")}
-                  />
-                  <div
-                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize z-20"
-                    onMouseDown={(e) => handleDragStart(e, step.id, "right")}
-                  />
-                  {/* Label */}
-                  <span
-                    className="font-mono text-[8px] leading-none truncate px-0.5 pointer-events-none select-none"
-                    style={{
-                      color: isRejected
-                        ? "#52525b"
-                        : isApproved
-                          ? "#fff"
-                          : "#e5484d",
-                    }}
-                  >
-                    ✂ {dur}s
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Video filmstrip track ────────────────────────── */}
+      {/* Timecode ruler */}
       <div
-        className="flex items-stretch shrink-0 border-b border-border"
-        style={{ height: 52 }}
+        className="shrink-0 flex"
+        style={{ height: 24, borderBottom: "1px solid var(--bg-border)" }}
       >
-        <div className="shrink-0 flex items-center justify-center w-14 border-r border-border">
-          <span className="font-mono text-[10px] text-fg-muted uppercase tracking-wider">
-            Video
-          </span>
-        </div>
-        <div className="flex-1 min-w-0 relative" data-timeline-track>
-          <div
-            ref={filmstripRef}
-            className="absolute inset-0 cursor-pointer bg-elevated"
-            onClick={handleTimelineClick}
-          >
-            {filmstripLoading && <FilmstripSkeleton />}
-            <div
-              ref={videoPlayheadRef}
-              className="absolute top-0 bottom-0 w-px z-20 pointer-events-none"
-              style={{ left: 0, background: "var(--waveform-act)" }}
-            />
-            {renderTrackCutRegions()}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Audio waveform track ─────────────────────────── */}
-      <div className="flex items-stretch flex-1 min-h-0">
-        <div className="shrink-0 flex items-center justify-center w-14 border-r border-border">
-          <span className="font-mono text-[10px] text-fg-muted uppercase tracking-wider">
-            Audio
-          </span>
-        </div>
-        <div className="flex-1 min-w-0 relative" data-timeline-track>
-          <div
-            className="absolute inset-0 cursor-pointer"
-            style={{ background: "var(--bg-surface)" }}
-            onClick={handleTimelineClick}
-          >
-            {waveformLoading && <WaveformSkeleton />}
-            <div
-              ref={waveformRef}
-              className="absolute inset-0 overflow-hidden"
-            />
-            <div
-              ref={audioPlayheadRef}
-              className="absolute top-0 bottom-0 w-px z-20 pointer-events-none"
-              style={{ left: 0, background: "var(--waveform-act)" }}
-            />
-            {renderTrackCutRegions()}
-          </div>
-        </div>
-      </div>
-
-      {/* Tooltip */}
-      {tooltip && (
+        {/* Ruler label spacer */}
+        <div className="shrink-0" style={{ width: 60 }} />
+        {/* Scrollable ruler */}
         <div
-          className="fixed z-50 px-2 py-1 rounded bg-elevated border border-border font-mono text-[10px] text-fg-secondary pointer-events-none"
+          ref={rulerScrollRef}
+          className="flex-1 overflow-hidden relative"
+          style={{ pointerEvents: "none" }}
+        >
+          <div
+            className="relative h-full cursor-pointer"
+            style={{
+              width: zoomWidth,
+              minWidth: "100%",
+              pointerEvents: "auto",
+            }}
+            onClick={handleTimelineClick}
+          >
+            {rulerMarks.map((mark) => (
+              <div
+                key={mark.time}
+                className="absolute"
+                style={{
+                  left: `${mark.pct}%`,
+                  top: 0,
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 1,
+                    height: 8,
+                    background: "var(--bg-border)",
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 9,
+                    color: "var(--text-muted)",
+                    marginTop: 1,
+                    transform: "translateX(-50%)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {formatRulerTime(mark.time)}
+                </span>
+              </div>
+            ))}
+            {/* Ruler playhead indicator */}
+            <div
+              ref={rulerPlayheadRef}
+              className="absolute z-20 pointer-events-none"
+              style={{ left: 0, top: 0, bottom: 0, width: 0 }}
+            >
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  background: "var(--playhead)",
+                  transform: "translateX(-50%) rotate(45deg)",
+                  position: "absolute",
+                  bottom: -1,
+                  left: 0,
+                  borderRadius: 1,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable tracks area */}
+      <div className="flex-1 flex min-h-0">
+        {/* Track labels (fixed) */}
+        <div className="shrink-0 flex flex-col" style={{ width: 60 }}>
+          <div
+            className="flex-1 flex items-center justify-end"
+            style={{
+              paddingRight: 10,
+              borderRight: "1px solid var(--bg-border)",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: "var(--text-secondary)",
+                fontWeight: 500,
+              }}
+            >
+              Main
+            </span>
+          </div>
+          <div
+            className="flex items-center justify-end"
+            style={{
+              height: 48,
+              paddingRight: 10,
+              borderRight: "1px solid var(--bg-border)",
+              borderTop: "1px solid var(--bg-border)",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                color: "var(--text-muted)",
+                fontWeight: 500,
+              }}
+            >
+              Audio
+            </span>
+          </div>
+        </div>
+
+        {/* Scrollable tracks content */}
+        <div
+          ref={scrollRef}
+          className="flex-1 flex flex-col min-h-0 overflow-x-auto overflow-y-hidden"
+          onScroll={handleTracksScroll}
           style={{
-            left: tooltip.x,
-            top: tooltip.y,
-            transform: "translate(-50%, -100%)",
+            scrollbarWidth: "thin",
+            scrollbarColor: "rgba(255,255,255,.1) transparent",
           }}
         >
-          {tooltip.text}
+          {/* Inner zoom container */}
+          <div
+            className="flex flex-col min-h-0 flex-1"
+            style={{ width: zoomWidth, minWidth: "100%" }}
+          >
+            {/* Main video track */}
+            <div className="flex-1 min-h-0">
+              <div
+                className="relative cursor-pointer h-full"
+                style={{ padding: "4px 0" }}
+                onClick={handleTimelineClick}
+              >
+                <div
+                  className="relative h-full overflow-hidden"
+                  style={{
+                    background: "rgba(255,255,255,.03)",
+                    borderRadius: 4,
+                    border: "1px solid rgba(255,255,255,.04)",
+                  }}
+                >
+                  {/* Fixed-width thumbnail tiles */}
+                  {visibleTiles.map((tile) => (
+                    <img
+                      key={tile.index}
+                      src={tile.url}
+                      alt=""
+                      draggable={false}
+                      style={{
+                        position: "absolute",
+                        left: tile.left,
+                        top: 0,
+                        width: THUMB_TILE_W,
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                        pointerEvents: "none",
+                        opacity: 0.85,
+                        borderRight: "1px solid rgba(0,0,0,.3)",
+                      }}
+                    />
+                  ))}
+                  {renderCutRegions()}
+                  {/* Playhead */}
+                  <div
+                    ref={playheadRef}
+                    className="absolute top-0 bottom-0 z-20 pointer-events-none"
+                    style={{
+                      left: 0,
+                      width: 2,
+                      background: "var(--playhead)",
+                      boxShadow: "0 0 6px var(--playhead)",
+                      borderRadius: 1,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Audio / Waveform track */}
+            <div
+              style={{
+                height: 48,
+                borderTop: "1px solid var(--bg-border)",
+              }}
+            >
+              <div
+                className="relative cursor-pointer h-full"
+                style={{ padding: "4px 0" }}
+                onClick={handleTimelineClick}
+              >
+                <div
+                  className="relative h-full overflow-hidden"
+                  style={{
+                    borderRadius: 4,
+                    background: "rgba(255,255,255,.02)",
+                  }}
+                >
+                  {waveformLoading && <WaveformSkeleton />}
+                  <div
+                    ref={waveformRef}
+                    className="absolute inset-0 overflow-hidden"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Cuts indicator */}
+      {approvedCuts > 0 && (
+        <div
+          className="shrink-0 flex items-center justify-end"
+          style={{
+            height: 20,
+            padding: "0 8px",
+            borderTop: "1px solid var(--bg-border)",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 9,
+              color: "var(--danger)",
+              opacity: 0.6,
+            }}
+          >
+            {approvedCuts} approved cut{approvedCuts !== 1 ? "s" : ""}
+          </span>
         </div>
       )}
     </div>

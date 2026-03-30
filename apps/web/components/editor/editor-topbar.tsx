@@ -1,64 +1,96 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { ChevronLeft, Download } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
 
-export function EditorTopbar({
-  email,
-}: {
-  email: string | null;
-  plan: string;
-}) {
-  const router = useRouter();
-  const projectName = useEditorStore((s) => s.projectName);
+export function EditorTopbar() {
   const steps = useEditorStore((s) => s.steps);
+  const status = useEditorStore((s) => s.status);
+  const filename = useEditorStore((s) => s.projectName);
 
   const hasApproved = steps.some((s) => s.status === "approved");
-
-  async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
-
-  const initial = email ? email[0].toUpperCase() : "U";
+  const exportDisabled = !hasApproved || status !== "done";
 
   return (
-    <header className="h-11 shrink-0 flex items-center justify-between px-3 border-b border-border bg-surface">
-      {/* Left: back + project name */}
-      <div className="flex items-center gap-2 min-w-0">
-        <Link
-          href="/projects"
-          className="flex items-center justify-center w-7 h-7 rounded-md text-fg-muted hover:text-fg hover:bg-elevated transition-colors"
-          title="Back to projects"
+    <header
+      className="shrink-0 flex items-center justify-between px-4"
+      style={{
+        height: 48,
+        background: "var(--bg-surface)",
+        borderBottom: "1px solid var(--bg-border)",
+      }}
+    >
+      {/* Left: Back */}
+      <Link
+        href="/"
+        className="flex items-center gap-1.5 editor-back-link"
+        style={{
+          color: "var(--text-muted)",
+          textDecoration: "none",
+          transition: "color 150ms ease",
+        }}
+      >
+        <ChevronLeft size={15} strokeWidth={1.5} />
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 11,
+            fontWeight: 600,
+          }}
         >
-          <ArrowLeft size={14} strokeWidth={1.5} />
-        </Link>
-        <span className="font-mono text-[12px] text-fg-secondary truncate max-w-75">
-          {projectName ?? "Untitled"}
+          Home
+        </span>
+      </Link>
+
+      {/* Centre: Filename */}
+      <div
+        style={{
+          position: "absolute",
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: 13,
+            fontWeight: 700,
+            color: "var(--text-primary)",
+          }}
+        >
+          {filename}
         </span>
       </div>
 
-      {/* Right: Export button + avatar */}
-      <div className="flex items-center gap-2">
-        <button
-          disabled={!hasApproved}
-          className="px-3.5 py-1.5 rounded-md bg-fg text-[#080809] font-display text-[11px] font-semibold tracking-[0.02em] hover:bg-accent-hover active:scale-[0.98] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          Export
-        </button>
-        <button
-          onClick={handleSignOut}
-          className="w-6 h-6 rounded-md bg-elevated flex items-center justify-center text-fg-secondary text-[10px] font-display font-semibold hover:bg-border transition-colors"
-          title="Sign out"
-        >
-          {initial}
-        </button>
-      </div>
+      {/* Right: Export button */}
+      <button
+        disabled={exportDisabled}
+        className={exportDisabled ? "" : "gradient-bg"}
+        style={{
+          color: exportDisabled ? "var(--text-muted)" : "#fff",
+          fontFamily: "var(--font-display)",
+          fontSize: 11,
+          fontWeight: 700,
+          padding: "6px 14px",
+          borderRadius: 7,
+          border: exportDisabled ? "1px solid var(--bg-border)" : "none",
+          cursor: exportDisabled ? "not-allowed" : "pointer",
+          background: exportDisabled ? "transparent" : undefined,
+          opacity: exportDisabled ? 0.4 : 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          transition: "all 150ms ease",
+          boxShadow: exportDisabled ? "none" : "0 0 16px rgba(255,106,82,.2)",
+        }}
+      >
+        <Download size={12} strokeWidth={1.5} />
+        Export
+      </button>
     </header>
   );
 }

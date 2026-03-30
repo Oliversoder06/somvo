@@ -3,14 +3,15 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Panel, Group, Separator } from "react-resizable-panels";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEditorStore, type EditStep } from "@/lib/store/editor";
 import { VideoPreview } from "@/components/editor/video-preview";
 import { AgentPanel } from "@/components/editor/agent-panel";
 import { Timeline } from "@/components/editor/timeline";
+import { TransportBar } from "@/components/editor/transport-bar";
+import { EditorSidebar } from "@/components/editor/editor-sidebar";
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,14 +22,14 @@ export default function EditorPage() {
   const setProjectName = useEditorStore((s) => s.setProjectName);
   const setStatus = useEditorStore((s) => s.setStatus);
   const setVideoUrl = useEditorStore((s) => s.setVideoUrl);
-  const setSteps = useEditorStore((s) => s.setSteps);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const setIsPlaying = useEditorStore((s) => s.setIsPlaying);
   const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
   const addStep = useEditorStore((s) => s.addStep);
-  const setAgentStatus = useEditorStore((s) => s.setAgentStatus);
-  const clearAgent = useEditorStore((s) => s.clearAgent);
-  const setPipelineLog = useEditorStore((s) => s.setPipelineLog);
+  const addAgentMessage = useEditorStore((s) => s.addAgentMessage);
+  const setAgentState = useEditorStore((s) => s.setAgentState);
+  const clearSteps = useEditorStore((s) => s.clearSteps);
+  const agentState = useEditorStore((s) => s.agentState);
 
   const [prompt, setPrompt] = useState("");
 
@@ -46,12 +47,15 @@ export default function EditorPage() {
     },
   });
 
-  // Sync project data into Zustand store — set to 'ready' (no auto-processing)
+  // Sync project data into Zustand store
   useEffect(() => {
     if (!project) return;
     setProjectId(project.id);
-    setProjectName(project.filename);
-    // If project was left in processing state, reset to ready
+    setProjectName(
+      project.filename ??
+        project.raw_url?.split("/").pop()?.split("?")[0] ??
+        "Untitled",
+    );
     const effectiveStatus =
       project.status === "processing" ? "ready" : project.status;
     setStatus(
@@ -64,63 +68,50 @@ export default function EditorPage() {
     );
   }, [project, setProjectId, setProjectName, setStatus]);
 
-  // Generate signed URL when project is available
+  // Generate signed URL
   useEffect(() => {
     if (!project?.raw_url) return;
-
     async function getSignedUrl() {
-      const { data, error } = await supabase.storage
+      const { data } = await supabase.storage
         .from("raw")
         .createSignedUrl(project!.raw_url!, 3600);
-      if (error) {
-        console.error(
-          "[Somvo] Failed to create signed URL:",
-          error.message,
-          "path:",
-          project!.raw_url,
-        );
-        return;
-      }
-      if (data?.signedUrl) {
-        setVideoUrl(data.signedUrl);
-      }
+      if (data?.signedUrl) setVideoUrl(data.signedUrl);
     }
-
     getSignedUrl();
   }, [project?.raw_url, supabase.storage, setVideoUrl, project]);
 
-  // Fetch existing edit steps if project already has them
-  const fetchEditSteps = useCallback(async () => {
-    const { data } = await supabase
-      .from("edit_steps")
-      .select("steps")
-      .eq("project_id", id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (data?.steps) {
-      // Map existing steps to include status field
-      const mapped = (data.steps as unknown as EditStep[]).map((s) => ({
-        ...s,
-        status: s.status ?? ("pending" as const),
-      }));
-      setSteps(mapped);
-    }
-  }, [id, supabase, setSteps]);
-
+  // Fetch existing edit steps
   useEffect(() => {
-    if (project?.status === "ready" || project?.status === "done") {
-      fetchEditSteps();
+    if (!project || (project.status !== "ready" && project.status !== "done"))
+      return;
+    async function fetchSteps() {
+      const { data } = await supabase
+        .from("edit_steps")
+        .select("steps")
+        .eq("project_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      if (data?.steps) {
+        const mapped = (data.steps as unknown as EditStep[]).map((s) => ({
+          ...s,
+          status: s.status ?? ("pending" as const),
+        }));
+        mapped.forEach((s) => addStep(s));
+        setAgentState("done");
+      }
     }
-  }, [project?.status, fetchEditSteps]);
+    fetchSteps();
+  }, [project?.status, id, supabase, addStep, setAgentState]);
 
-  // SSE stream handler for /api/analyse
+  // SSE stream handler
   const handleSubmitPrompt = useCallback(async () => {
     if (!prompt.trim() || !id) return;
     const currentPrompt = prompt;
     setPrompt("");
-    clearAgent();
+
+    setAgentState("streaming");
+    clearSteps();
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -139,37 +130,25 @@ export default function EditorPage() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
-        const text = decoder.decode(value);
-        const lines = text.split("\n");
+        const lines = decoder.decode(value).split("\n");
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           try {
             const event = JSON.parse(line.slice(6));
-            if (event.type === "status") {
-              setAgentStatus(event.message);
-            }
-            if (event.type === "cut") {
-              addStep({
-                ...event.step,
-                status: "pending" as const,
-              });
-            }
-            if (event.type === "log_summary") {
-              setPipelineLog(event.summary);
-            }
-            if (event.type === "done") {
-              setAgentStatus(null);
-            }
+            if (event.type === "status") addAgentMessage(event.message);
+            if (event.type === "cut")
+              addStep({ ...event.step, status: "approved" as const });
+            if (event.type === "done") setAgentState("done");
+            if (event.type === "error") setAgentState("failed");
           } catch {
             // Ignore malformed SSE lines
           }
         }
       }
     } catch {
-      setAgentStatus(null);
+      setAgentState("failed");
     }
-  }, [prompt, id, clearAgent, setAgentStatus, addStep, setPipelineLog]);
+  }, [prompt, id, setAgentState, clearSteps, addAgentMessage, addStep]);
 
   // Keyboard shortcuts
   useHotkeys(
@@ -178,11 +157,8 @@ export default function EditorPage() {
       e.preventDefault();
       const el = playerRef.current;
       if (!el) return;
-      if (isPlaying) {
-        el.pause();
-      } else {
-        el.play().catch(() => setIsPlaying(false));
-      }
+      if (isPlaying) el.pause();
+      else el.play().catch(() => setIsPlaying(false));
     },
     { enableOnFormTags: false },
     [isPlaying],
@@ -202,18 +178,41 @@ export default function EditorPage() {
     setCurrentTime(el.currentTime);
   });
 
-  // Loading state
+  const handleSeek = useCallback(
+    (time: number) => {
+      const el = playerRef.current;
+      if (!el) return;
+      el.currentTime = time;
+      setCurrentTime(time);
+      el.play().catch(() => {});
+    },
+    [playerRef, setCurrentTime],
+  );
+
+  const isStreaming = agentState === "streaming";
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full bg-base">
+      <div
+        className="flex items-center justify-center h-full"
+        style={{ background: "var(--bg-base)" }}
+      >
         <div className="flex flex-col items-center gap-3">
           <Loader2
-            size={24}
+            size={20}
             strokeWidth={1.5}
-            className="text-fg-muted animate-spin"
+            className="animate-spin"
+            style={{ color: "var(--accent)" }}
           />
-          <span className="font-mono text-[12px] text-fg-muted">
-            Loading editor…
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              color: "var(--text-muted)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            Loading editor...
           </span>
         </div>
       </div>
@@ -221,54 +220,38 @@ export default function EditorPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Main content: video + agent panel */}
-      <div className="flex-1 min-h-0">
-        <Group orientation="horizontal" id="editor-h">
-          {/* Video preview */}
-          <Panel defaultSize="60%" minSize="35%">
-            <VideoPreview playerRef={playerRef} />
-          </Panel>
+    <div
+      className="flex"
+      style={{
+        height: "100%",
+        background: "var(--bg-base)",
+        overflow: "hidden",
+      }}
+    >
+      {/* Left icon sidebar */}
+      <EditorSidebar />
 
-          <Separator className="w-px bg-border hover:bg-accent/40 active:bg-accent/60 transition-colors cursor-col-resize" />
+      {/* ---- Centre: video + transport + timeline stacked ---- */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        {/* Video canvas - fills remaining space */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <VideoPreview playerRef={playerRef} />
+        </div>
 
-          {/* Agent panel */}
-          <Panel defaultSize="40%" minSize="25%">
-            <AgentPanel />
-          </Panel>
-        </Group>
+        {/* Transport bar */}
+        <TransportBar playerRef={playerRef} />
+
+        {/* Timeline */}
+        <Timeline playerRef={playerRef} />
       </div>
 
-      {/* Timeline — fixed 140px */}
-      <Timeline playerRef={playerRef} />
-
-      {/* Prompt bar — fixed 56px */}
-      <div
-        className="shrink-0 flex items-center gap-3 px-4 border-t border-border"
-        style={{ height: 56, background: "var(--bg-surface)" }}
-      >
-        <input
-          type="text"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmitPrompt();
-            }
-          }}
-          placeholder="What do you want to do with this video?"
-          className="flex-1 bg-elevated border border-border rounded-md px-3 py-2 text-[13px] text-fg placeholder:text-fg-muted font-body outline-none focus:border-fg-muted transition-colors"
-        />
-        {prompt.trim() && (
-          <button
-            onClick={handleSubmitPrompt}
-            className="flex items-center justify-center w-8 h-8 rounded-md bg-fg text-[#080809] hover:bg-accent-hover transition-colors shrink-0"
-          >
-            <ArrowRight size={16} strokeWidth={1.5} />
-          </button>
-        )}
-      </div>
+      {/* Right director/agent panel - full height */}
+      <AgentPanel
+        onSeek={handleSeek}
+        prompt={prompt}
+        setPrompt={setPrompt}
+        onSubmitPrompt={handleSubmitPrompt}
+      />
     </div>
   );
 }
