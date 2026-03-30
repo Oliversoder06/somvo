@@ -101,6 +101,57 @@ body {
   animation: spin 700ms linear infinite;
 }
 
+/* ─── Timeline Skeleton Loaders ──────────────────────────── */
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes scanLine {
+  0% {
+    left: -4rem;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 40%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.03) 60%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.skeleton-scan {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(226, 232, 240, 0.06),
+    transparent
+  );
+  animation: scanLine 2.2s ease-in-out infinite;
+}
+
 /* ─── Cards ──────────────────────────────────────────────── */
 
 .card {

@@ -9,21 +9,84 @@ function formatRulerTime(seconds: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/* ── Skeleton shimmer for loading tracks ── */
+function FilmstripSkeleton() {
+  return (
+    <div
+      className="absolute inset-0 z-30 overflow-hidden"
+      style={{ background: "#161618" }}
+    >
+      <div className="absolute inset-0 flex gap-0.5 p-0.5">
+        {Array.from({ length: 14 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-1 h-full rounded-[3px] relative overflow-hidden"
+            style={{ background: "#1a1a1e" }}
+          >
+            <div
+              className="absolute inset-0 skeleton-shimmer"
+              style={{ animationDelay: `${i * 100}ms` }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WaveformSkeleton() {
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Shimmer base */}
+      <div className="absolute inset-0 skeleton-shimmer" />
+      {/* Fake waveform bars */}
+      <div className="absolute inset-0 flex items-center gap-px px-0.5">
+        {Array.from({ length: 200 }).map((_, i) => {
+          const h =
+            15 +
+            Math.abs(Math.sin(i * 0.8) * 40) +
+            Math.abs(Math.cos(i * 1.3) * 20);
+          return (
+            <div
+              key={i}
+              className="flex-1 min-w-0 rounded-full"
+              style={{
+                height: `${h}%`,
+                background: "#27272a",
+                opacity: 0.6 + Math.abs(Math.sin(i * 0.5)) * 0.4,
+              }}
+            />
+          );
+        })}
+      </div>
+      {/* Scanning line */}
+      <div className="absolute top-0 bottom-0 w-16 skeleton-scan" />
+    </div>
+  );
+}
+
 /* ── Video filmstrip: capture frames from <video> onto a canvas ── */
 function useFilmstrip(
   playerRef: React.MutableRefObject<HTMLVideoElement | null>,
   duration: number,
   containerRef: React.RefObject<HTMLDivElement | null>,
-) {
+): boolean {
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     const el = playerRef.current;
     const container = containerRef.current;
     if (!el || !container || duration <= 0 || !el.src) return;
 
+    setLoading(true);
+
     const containerWidth = container.clientWidth;
     const thumbHeight = 48;
     const thumbWidth = 80;
-    const count = Math.max(1, Math.floor(containerWidth / thumbWidth));
+    const count = Math.min(
+      Math.max(1, Math.floor(containerWidth / thumbWidth)),
+      20,
+    );
 
     const canvas = document.createElement("canvas");
     canvas.width = containerWidth;
@@ -59,23 +122,30 @@ function useFilmstrip(
           offscreen.addEventListener("seeked", () => resolve(), { once: true });
         });
         if (cancelled) return;
-        ctx.drawImage(offscreen, i * sliceWidth, 0, sliceWidth, thumbHeight);
+        ctx!.drawImage(offscreen, i * sliceWidth, 0, sliceWidth, thumbHeight);
+
+        // Progressive render: update background after each frame
+        if (container) {
+          container.style.backgroundImage = `url(${canvas.toDataURL("image/jpeg", 0.5)})`;
+          container.style.backgroundSize = "100% 100%";
+          container.style.backgroundRepeat = "no-repeat";
+        }
       }
 
-      if (!cancelled && container) {
-        container.style.backgroundImage = `url(${canvas.toDataURL("image/jpeg", 0.6)})`;
-        container.style.backgroundSize = "100% 100%";
-        container.style.backgroundRepeat = "no-repeat";
-      }
+      if (!cancelled) setLoading(false);
     }
 
-    extractFrames().catch(() => {});
+    extractFrames().catch(() => {
+      if (!cancelled) setLoading(false);
+    });
 
     return () => {
       cancelled = true;
       offscreen.src = "";
     };
   }, [playerRef, duration, containerRef]);
+
+  return loading;
 }
 
 /* ── Audio waveform via WaveSurfer.js ── */
@@ -83,21 +153,25 @@ function useWaveform(
   playerRef: React.MutableRefObject<HTMLVideoElement | null>,
   duration: number,
   containerRef: React.RefObject<HTMLDivElement | null>,
-) {
+): boolean {
   const wsRef = useRef<unknown>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const el = playerRef.current;
     const container = containerRef.current;
     if (!el || !container || duration <= 0 || !el.src) return;
 
-    let ws: { destroy: () => void } | null = null;
+    setLoading(true);
+    let ws: ReturnType<
+      Awaited<typeof import("wavesurfer.js")>["default"]["create"]
+    > | null = null;
 
     async function initWaveSurfer() {
       try {
         const WaveSurfer = (await import("wavesurfer.js")).default;
         ws = WaveSurfer.create({
-          container,
+          container: container!,
           height: "auto",
           waveColor: "#3f3f46",
           progressColor: "#71717a",
@@ -107,11 +181,12 @@ function useWaveform(
           barRadius: 1,
           normalize: true,
           interact: false,
-          media: el,
+          url: el!.src,
         });
+        ws.on("ready", () => setLoading(false));
         wsRef.current = ws;
       } catch {
-        // WaveSurfer init failed
+        setLoading(false);
       }
     }
 
@@ -122,6 +197,8 @@ function useWaveform(
       wsRef.current = null;
     };
   }, [playerRef, duration, containerRef]);
+
+  return loading;
 }
 
 export function Timeline({
@@ -165,8 +242,8 @@ export function Timeline({
     text: string;
   } | null>(null);
 
-  useFilmstrip(playerRef, duration, filmstripRef);
-  useWaveform(playerRef, duration, waveformRef);
+  const filmstripLoading = useFilmstrip(playerRef, duration, filmstripRef);
+  const waveformLoading = useWaveform(playerRef, duration, waveformRef);
 
   const rulerTicks = useMemo(() => {
     if (duration <= 0) return [];
@@ -427,6 +504,7 @@ export function Timeline({
             className="absolute inset-0 cursor-pointer bg-elevated"
             onClick={handleTimelineClick}
           >
+            {filmstripLoading && <FilmstripSkeleton />}
             <div
               ref={videoPlayheadRef}
               className="absolute top-0 bottom-0 w-px z-20 pointer-events-none"
@@ -450,7 +528,11 @@ export function Timeline({
             style={{ background: "var(--bg-surface)" }}
             onClick={handleTimelineClick}
           >
-            <div ref={waveformRef} className="absolute inset-0" />
+            {waveformLoading && <WaveformSkeleton />}
+            <div
+              ref={waveformRef}
+              className="absolute inset-0 overflow-hidden"
+            />
             <div
               ref={audioPlayheadRef}
               className="absolute top-0 bottom-0 w-px z-20 pointer-events-none"
