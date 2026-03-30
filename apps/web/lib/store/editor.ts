@@ -4,7 +4,7 @@ export type StepStatus = "pending" | "approved" | "rejected";
 
 export type EditStep = {
   id: string;
-  type: "cut_silence" | "cut_filler" | "caption";
+  type: "cut_silence" | "cut_filler" | "shorten" | "split" | "trim" | "caption";
   reason: string;
   startTime: number;
   endTime: number;
@@ -52,6 +52,7 @@ interface EditorStore {
   projectName: string;
   status: "uploading" | "processing" | "ready" | "done" | "failed";
   videoUrl: string | null;
+  processedUrl: string | null;
   duration: number;
   currentTime: number;
   isPlaying: boolean;
@@ -66,6 +67,7 @@ interface EditorStore {
   setProjectName: (name: string) => void;
   setStatus: (s: EditorStore["status"]) => void;
   setVideoUrl: (url: string) => void;
+  setProcessedUrl: (url: string | null) => void;
   setDuration: (d: number) => void;
   setCurrentTime: (t: number) => void;
   setIsPlaying: (p: boolean) => void;
@@ -92,6 +94,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   projectName: "Untitled",
   status: "ready",
   videoUrl: null,
+  processedUrl: null,
   duration: 0,
   currentTime: 0,
   isPlaying: false,
@@ -109,6 +112,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setProjectName: (name) => set({ projectName: name }),
   setStatus: (s) => set({ status: s }),
   setVideoUrl: (url) => set({ videoUrl: url }),
+  setProcessedUrl: (url) => set({ processedUrl: url }),
   setDuration: (d) => set({ duration: d }),
   setCurrentTime: (t) => set({ currentTime: t }),
   setIsPlaying: (p) => set({ isPlaying: p }),

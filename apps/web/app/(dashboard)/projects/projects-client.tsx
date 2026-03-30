@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { ProjectCard, type Project } from "@/components/project-card";
@@ -26,6 +26,18 @@ export function ProjectsPageClient({
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Re-fetch server data when the tab/window regains focus
+  useEffect(() => {
+    const onFocus = () => router.refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [router]);
+
+  // Also refresh once on mount to catch stale cache from back-navigation
+  useEffect(() => {
+    router.refresh();
+  }, [router]);
 
   const handleUpload = useCallback(
     async (file: File) => {

@@ -22,6 +22,7 @@ export default function EditorPage() {
   const setProjectName = useEditorStore((s) => s.setProjectName);
   const setStatus = useEditorStore((s) => s.setStatus);
   const setVideoUrl = useEditorStore((s) => s.setVideoUrl);
+  const setProcessedUrl = useEditorStore((s) => s.setProcessedUrl);
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const setIsPlaying = useEditorStore((s) => s.setIsPlaying);
   const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
@@ -67,7 +68,8 @@ export default function EditorPage() {
         | "uploading"
         | "processing",
     );
-  }, [project, setProjectId, setProjectName, setStatus]);
+    if (project.processed_url) setProcessedUrl(project.processed_url);
+  }, [project, setProjectId, setProjectName, setStatus, setProcessedUrl]);
 
   // Generate signed URL
   useEffect(() => {

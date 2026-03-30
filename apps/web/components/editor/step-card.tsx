@@ -14,6 +14,9 @@ function formatTimestamp(seconds: number) {
 const TYPE_LABELS: Record<string, string> = {
   cut_silence: "CUT SILENCE",
   cut_filler: "CUT FILLER",
+  shorten: "SHORTEN",
+  split: "SPLIT",
+  trim: "TRIM",
   caption: "CAPTION",
 };
 

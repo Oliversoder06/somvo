@@ -1,8 +1,10 @@
 import os
+import logging
 import shutil
 import tempfile
 from typing import Optional
 
+import ffmpeg as ffmpeg_lib
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -12,10 +14,12 @@ from modal_app.ffmpeg_utils import (
     burn_captions,
     apply_watermark,
     cap_resolution,
+    concat_segments,
     execute_edit_steps,
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class ExecuteRequest(BaseModel):
@@ -69,7 +73,47 @@ async def execute_edits(req: ExecuteRequest):
         clip_paths: list[str] = [video_path]
         if edit_steps:
             clip_paths = execute_edit_steps(video_path, edit_steps, work_dir)
-            current_path = clip_paths[0]
+
+            # Always produce a single output — concatenate split clips
+            if len(clip_paths) > 1:
+                merged_path = os.path.join(work_dir, "merged_output.mp4")
+                concat_segments(clip_paths, merged_path)
+                current_path = merged_path
+            else:
+                current_path = clip_paths[0]
+
+            # Validate: output duration should match expected keep duration
+            # Merge overlapping removals before summing (matches FFmpeg logic)
+            raw_ranges = sorted(
+                [(s["start_time"], s["end_time"]) for s in edit_steps],
+                key=lambda x: x[0],
+            )
+            merged_ranges: list[tuple[float, float]] = []
+            for s_t, e_t in raw_ranges:
+                if merged_ranges and s_t <= merged_ranges[-1][1]:
+                    merged_ranges[-1] = (merged_ranges[-1][0], max(merged_ranges[-1][1], e_t))
+                else:
+                    merged_ranges.append((s_t, e_t))
+            total_removed = sum(e - s for s, e in merged_ranges)
+            source_probe = ffmpeg_lib.probe(video_path)
+            source_dur = float(source_probe["format"]["duration"])
+            expected_dur = source_dur - total_removed
+            try:
+                out_probe = ffmpeg_lib.probe(current_path)
+                actual_dur = float(out_probe["format"]["duration"])
+                if expected_dur > 0 and actual_dur < expected_dur * 0.8:
+                    logger.error(
+                        "Duration mismatch: source=%.1fs, removed=%.1fs, "
+                        "expected ~%.1fs, got %.1fs (%d edit steps, %d clips)",
+                        source_dur, total_removed, expected_dur, actual_dur,
+                        len(edit_steps), len(clip_paths),
+                    )
+                    raise RuntimeError(
+                        f"Processed video is {actual_dur:.0f}s but expected "
+                        f"~{expected_dur:.0f}s. The export was truncated."
+                    )
+            except (KeyError, ValueError):
+                pass  # probe failed — continue cautiously
 
         # Burn captions if any caption steps approved
         caption_steps = [s for s in req.approved_steps if s.type == "caption"]
@@ -108,26 +152,14 @@ async def execute_edits(req: ExecuteRequest):
             cap_resolution(current_path, capped_output, max_height=720)
             current_path = capped_output
 
-        # Upload processed video(s) to Supabase Storage
-        # If multiple clips from split, upload each; primary is clip 0
+        # Upload processed video to Supabase Storage
         storage_path = f"{user_id}/{req.project_id}/output.mp4"
-        if len(clip_paths) > 1:
-            for i, cp in enumerate(clip_paths):
-                clip_storage = f"{user_id}/{req.project_id}/clip_{i}.mp4"
-                with open(cp, "rb") as f:
-                    supabase.storage.from_("processed").upload(
-                        clip_storage,
-                        f.read(),
-                        file_options={"content-type": "video/mp4", "upsert": "true"},
-                    )
-            storage_path = f"{user_id}/{req.project_id}/clip_0.mp4"
-        else:
-            with open(current_path, "rb") as f:
-                supabase.storage.from_("processed").upload(
-                    storage_path,
-                    f.read(),
-                    file_options={"content-type": "video/mp4", "upsert": "true"},
-                )
+        with open(current_path, "rb") as f:
+            supabase.storage.from_("processed").upload(
+                storage_path,
+                f.read(),
+                file_options={"content-type": "video/mp4", "upsert": "true"},
+            )
 
         # Update project status
         supabase.table("projects").update({

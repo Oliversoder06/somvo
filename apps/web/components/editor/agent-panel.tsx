@@ -57,6 +57,7 @@ export function AgentPanel({
   const rejectAll = useEditorStore((s) => s.rejectAll);
   const projectId = useEditorStore((s) => s.projectId);
   const setStatus = useEditorStore((s) => s.setStatus);
+  const setProcessedUrl = useEditorStore((s) => s.setProcessedUrl);
   const duration = useEditorStore((s) => s.duration);
   const agentPanelOpen = useEditorStore((s) => s.agentPanelOpen);
   const toggleAgentPanel = useEditorStore((s) => s.toggleAgentPanel);
@@ -90,13 +91,25 @@ export function AgentPanel({
 
   const hasApproved = steps.some((s) => s.status === "approved");
 
-  const totalRemoved = useMemo(
-    () =>
-      steps
-        .filter((s) => s.status === "approved")
-        .reduce((sum, s) => sum + (s.endTime - s.startTime), 0),
-    [steps],
-  );
+  const totalRemoved = useMemo(() => {
+    // Merge overlapping step ranges before summing, matching backend logic
+    const ranges = steps
+      .filter((s) => s.status === "approved")
+      .map((s) => [s.startTime, s.endTime] as [number, number])
+      .sort((a, b) => a[0] - b[0]);
+    const merged: [number, number][] = [];
+    for (const [s, e] of ranges) {
+      if (merged.length && s <= merged[merged.length - 1][1]) {
+        merged[merged.length - 1][1] = Math.max(
+          merged[merged.length - 1][1],
+          e,
+        );
+      } else {
+        merged.push([s, e]);
+      }
+    }
+    return merged.reduce((sum, [s, e]) => sum + (e - s), 0);
+  }, [steps]);
 
   const approvedCount = steps.filter((s) => s.status === "approved").length;
   const finalDuration = duration - totalRemoved;
@@ -163,6 +176,8 @@ export function AgentPanel({
         }),
       });
       if (res.ok) {
+        const body = await res.json().catch(() => null);
+        if (body?.processed_url) setProcessedUrl(body.processed_url);
         stopProgress(true);
         // Brief pause at 100% before transitioning
         await new Promise((r) => setTimeout(r, 500));

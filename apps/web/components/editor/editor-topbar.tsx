@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, Download } from "lucide-react";
+import { ChevronLeft, Download, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { useEditorStore } from "@/lib/store/editor";
 
 export function EditorTopbar() {
@@ -9,8 +11,53 @@ export function EditorTopbar() {
   const status = useEditorStore((s) => s.status);
   const filename = useEditorStore((s) => s.projectName);
 
+  const processedUrl = useEditorStore((s) => s.processedUrl);
+  const projectId = useEditorStore((s) => s.projectId);
+  const [isExporting, setIsExporting] = useState(false);
+
   const hasApproved = steps.some((s) => s.status === "approved");
-  const exportDisabled = !hasApproved || status !== "done";
+  const exportDisabled = !hasApproved || status !== "done" || isExporting;
+
+  async function handleExport() {
+    if (exportDisabled) return;
+    setIsExporting(true);
+    try {
+      const supabase = createClient();
+      // Try stored processedUrl, fall back to convention
+      const storagePath =
+        processedUrl ||
+        (projectId
+          ? await supabase
+              .from("projects")
+              .select("processed_url")
+              .eq("id", projectId)
+              .single()
+              .then((r) => r.data?.processed_url)
+          : null);
+      if (!storagePath) {
+        alert("Processed video not found");
+        return;
+      }
+      const { data } = await supabase.storage
+        .from("processed")
+        .createSignedUrl(storagePath, 300);
+      if (!data?.signedUrl) {
+        alert("Could not generate download link");
+        return;
+      }
+      // Download via hidden anchor
+      const a = document.createElement("a");
+      a.href = data.signedUrl;
+      a.download = filename || "export.mp4";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch {
+      alert("Export failed — try again");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   return (
     <header
@@ -73,6 +120,7 @@ export function EditorTopbar() {
       {/* Right: Export button */}
       <button
         disabled={exportDisabled}
+        onClick={handleExport}
         className={exportDisabled ? "" : "gradient-bg"}
         style={{
           color: exportDisabled ? "var(--text-muted)" : "#fff",
@@ -92,8 +140,12 @@ export function EditorTopbar() {
           boxShadow: exportDisabled ? "none" : "0 0 16px rgba(255,106,82,.2)",
         }}
       >
-        <Download size={12} strokeWidth={1.5} />
-        Export
+        {isExporting ? (
+          <Loader2 size={12} strokeWidth={1.5} className="animate-spin" />
+        ) : (
+          <Download size={12} strokeWidth={1.5} />
+        )}
+        {isExporting ? "Downloading..." : "Export"}
       </button>
     </header>
   );

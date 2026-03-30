@@ -39,24 +39,8 @@ def cut_silence(video_path: str, silence_segments: list[dict], output_path: str)
         shutil.copy2(video_path, output_path)
         return output_path
 
-    # Seek into the source file once per keep-segment and concat.
-    # This guarantees audio and video are cut at the same boundaries
-    # and avoids the timestamp drift of select/aselect + setpts/asetpts.
-    segments = []
-    for start, end in keep:
-        seg = ffmpeg.input(video_path, ss=start, t=end - start)
-        segments.extend([seg.video, seg.audio])
-
-    joined = ffmpeg.concat(*segments, v=1, a=1).node
-    v_out = joined[0]
-    a_out = joined[1].filter("highpass", f=20)  # Remove DC offset clicks at splice points
-
-    (
-        ffmpeg
-        .output(v_out, a_out, output_path)
-        .overwrite_output()
-        .run(quiet=True)
-    )
+    # Delegate to the robust two-pass renderer
+    _render_keep_segments(video_path, keep, output_path)
     return output_path
 
 
@@ -77,11 +61,11 @@ def burn_captions(video_path: str, srt_path: str, output_path: str) -> str:
 def apply_watermark(video_path: str, watermark_path: str, output_path: str) -> str:
     """Overlay a watermark image in the bottom-right corner."""
     main = ffmpeg.input(video_path)
-    logo = ffmpeg.input(watermark_path)
+    logo = ffmpeg.input(watermark_path, loop=1, framerate=25)
+    overlaid = ffmpeg.filter([main.video, logo.video], "overlay", "W-w-10", "H-h-10", shortest=1)
     (
         ffmpeg
-        .filter([main, logo], "overlay", "W-w-10", "H-h-10")
-        .output(output_path)
+        .output(overlaid, main.audio, output_path)
         .overwrite_output()
         .run(quiet=True)
     )
@@ -257,7 +241,14 @@ def _render_keep_segments(
     keep: list[tuple[float, float]],
     output_path: str,
 ) -> str:
-    """Concat *keep* intervals from *video_path* into *output_path*."""
+    """Concat *keep* intervals from *video_path* into *output_path*.
+
+    Uses a two-pass approach for reliability:
+      1. Extract each keep segment to a temp file (accurate seeking).
+      2. Join with the concat demuxer (fast, lossless join).
+    This avoids the unreliable N-input concat filter graph that can
+    silently truncate output when the segment count is high.
+    """
     if not keep:
         shutil.copy2(video_path, output_path)
         return output_path
@@ -274,19 +265,59 @@ def _render_keep_segments(
         )
         return output_path
 
-    segments = []
-    for start, end in keep:
-        seg = ffmpeg.input(video_path, ss=start, t=end - start)
-        segments.extend([seg.video, seg.audio])
+    work_dir = os.path.dirname(output_path)
+    segment_paths: list[str] = []
 
-    joined = ffmpeg.concat(*segments, v=1, a=1).node
-    v_out = joined[0]
-    a_out = joined[1].filter("highpass", f=20)
+    # Pass 1: extract each keep segment to its own file
+    for i, (start, end) in enumerate(keep):
+        seg_path = os.path.join(work_dir, f"_seg_{i}.mp4")
+        seg = ffmpeg.input(video_path, ss=start, t=end - start)
+        a_out = seg.audio.filter("highpass", f=20)
+        (
+            ffmpeg
+            .output(seg.video, a_out, seg_path)
+            .overwrite_output()
+            .run(quiet=True)
+        )
+        segment_paths.append(seg_path)
+
+    # Pass 2: join with concat demuxer (stream-copy, no re-encode)
+    list_file = os.path.join(work_dir, "_concat_list.txt")
+    with open(list_file, "w") as f:
+        for p in segment_paths:
+            safe = p.replace("'", "'\\''")
+            f.write(f"file '{safe}'\n")
 
     (
         ffmpeg
-        .output(v_out, a_out, output_path)
+        .input(list_file, format="concat", safe=0)
+        .output(output_path, c="copy")
         .overwrite_output()
         .run(quiet=True)
     )
+
+    # Validate output duration
+    expected = sum(end - start for start, end in keep)
+    try:
+        probe = ffmpeg.probe(output_path)
+        actual = float(probe["format"]["duration"])
+        if actual < expected * 0.85:
+            raise RuntimeError(
+                f"Concat produced {actual:.1f}s but expected ~{expected:.1f}s "
+                f"({len(keep)} segments). Output may be truncated."
+            )
+    except (KeyError, ValueError):
+        pass  # probe failed — let downstream handle it
+
+    # Cleanup temp segments
+    for p in segment_paths:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+    try:
+        os.remove(list_file)
+    except OSError:
+        pass
+
     return output_path
