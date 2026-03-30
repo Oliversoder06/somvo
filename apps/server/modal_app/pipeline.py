@@ -49,10 +49,12 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
         transcript = transcribe_video(video_path)
 
         # 3. Cross-validate silence using transcript gaps + audio energy
-        silences = detect_silence_combined(video_path, transcript["words"])
+        silences, audio_silences = detect_silence_combined(video_path, transcript["words"])
 
         # 4. Generate cut list
-        steps, pipeline_log = generate_cut_list(silences, transcript, duration)
+        steps, pipeline_log = generate_cut_list(
+            silences, transcript, duration, audio_silences=audio_silences,
+        )
 
         # 5. Store transcript in Supabase
         supabase.table("transcripts").insert(

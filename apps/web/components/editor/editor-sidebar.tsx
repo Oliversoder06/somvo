@@ -26,15 +26,15 @@ const tools = [
     shortcut: "C",
     enabled: true,
   },
-  { id: "text", icon: Type, label: "Captions — Coming soon", enabled: false },
-  { id: "music", icon: Music, label: "Music — Coming soon", enabled: false },
-  { id: "audio", icon: Volume2, label: "Audio — Coming soon", enabled: false },
-  {
-    id: "effects",
-    icon: Wand2,
-    label: "Effects — Coming soon",
-    enabled: false,
-  },
+  // { id: "text", icon: Type, label: "Captions — Coming soon", enabled: false },
+  // { id: "music", icon: Music, label: "Music — Coming soon", enabled: false },
+  // { id: "audio", icon: Volume2, label: "Audio — Coming soon", enabled: false },
+  // {
+  //   id: "effects",
+  //   icon: Wand2,
+  //   label: "Effects — Coming soon",
+  //   enabled: false,
+  // },
 ] as const;
 
 export function EditorSidebar() {

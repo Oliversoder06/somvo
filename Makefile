@@ -1,4 +1,4 @@
-.PHONY: dev server web
+.PHONY: dev server web deploy
 
 # On Unix/macOS: make dev
 # On Windows (PowerShell): make dev-win
@@ -13,3 +13,6 @@ server:
 
 web:
 	cd apps; cd web ; npm run dev
+
+deploy:
+	cd apps/server ; python -m modal deploy modal_app/deploy.py

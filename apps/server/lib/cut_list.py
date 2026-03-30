@@ -20,11 +20,30 @@ FILLER_WORDS = {
 PADDING_S = 0.075
 
 
+def _audio_overlap_ratio(
+    seg_start: float,
+    seg_end: float,
+    audio_silences: list[dict],
+) -> float:
+    """Return the fraction of [seg_start, seg_end] covered by audio silence."""
+    seg_dur = seg_end - seg_start
+    if seg_dur <= 0:
+        return 0.0
+    total = 0.0
+    for au in audio_silences:
+        o_start = max(seg_start, au["start"])
+        o_end = min(seg_end, au["end"])
+        if o_end > o_start:
+            total += o_end - o_start
+    return total / seg_dur
+
+
 def generate_cut_list(
     silence_segments: list[dict],
     transcript: dict,
     duration: float,
     *,
+    audio_silences: list[dict] | None = None,
     min_silence: float = 0.3,
     padding: float = PADDING_S,
     filler_padding: float = 0.075,
@@ -67,7 +86,20 @@ def generate_cut_list(
             log.silence_skipped(seg["start"], seg["end"], gap, reason=f"below keep threshold ({thresholds.keep_below}s)")
             continue
 
-        sc = score_silence(gap, has_transcript_gap=True)
+        # Compute energy signals when audio silence data is available
+        low_energy = False
+        overlaps_speech = False
+        if audio_silences is not None:
+            overlap = _audio_overlap_ratio(seg["start"], seg["end"], audio_silences)
+            low_energy = overlap >= 0.7
+            overlaps_speech = overlap < 0.3
+
+        sc = score_silence(
+            gap,
+            has_transcript_gap=True,
+            low_energy=low_energy,
+            overlaps_speech=overlaps_speech,
+        )
 
         if action == "shorten":
             cut_start, cut_end = compute_shorten_bounds(

@@ -31,11 +31,13 @@ class SilencePipeline(BasePipeline):
 
         yield {"type": "status", "message": f"Found {word_count} words"}
 
-        silences = detect_silence_combined(video_path, transcript["words"])
+        silences, audio_silences = detect_silence_combined(video_path, transcript["words"])
 
         yield {"type": "status", "message": f"Detected {len(silences)} silence regions"}
 
-        steps, pipeline_log = generate_cut_list(silences, transcript, duration)
+        steps, pipeline_log = generate_cut_list(
+            silences, transcript, duration, audio_silences=audio_silences,
+        )
 
         yield {"type": "status", "message": "Proposing cuts..."}
         yield {

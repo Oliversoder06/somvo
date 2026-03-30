@@ -64,12 +64,15 @@ def detect_silence_ffmpeg(
 def cross_validate_silence(
     transcript_silences: list[dict],
     audio_silences: list[dict],
-    min_overlap_ratio: float = 0.3,
+    min_overlap_ratio: float = 0.5,
+    min_absolute_overlap: float = 0.15,
 ) -> list[dict]:
     """
     Keep transcript silence segments confirmed by audio energy analysis.
-    A segment passes if at least min_overlap_ratio of the transcript gap
-    overlaps with audio-detected silence regions.
+    A segment passes if:
+      - at least *min_overlap_ratio* of the transcript gap overlaps with
+        audio-detected silence regions, AND
+      - the absolute overlap is at least *min_absolute_overlap* seconds.
     """
     validated = []
     for ts in transcript_silences:
@@ -85,7 +88,8 @@ def cross_validate_silence(
             if o_end > o_start:
                 total_overlap += o_end - o_start
 
-        if total_overlap / ts_dur >= min_overlap_ratio:
+        if (total_overlap / ts_dur >= min_overlap_ratio
+                and total_overlap >= min_absolute_overlap):
             validated.append({"start": ts_start, "end": ts_end})
 
     return validated
@@ -96,20 +100,28 @@ def detect_silence_combined(
     words: list[dict],
     min_silence: float = 0.3,
     noise_db: float = -35.0,
-) -> list[dict]:
+) -> tuple[list[dict], list[dict] | None]:
     """
     Cross-validate transcript word gaps with FFmpeg audio energy detection.
     Only cuts regions where both transcript gaps AND audio energy agree
     there is silence, eliminating false positives from transcript timing drift.
     Falls back to transcript-only if audio detection fails.
+
+    Returns
+    -------
+    (validated_silences, audio_silences | None)
+        The second element is the raw FFmpeg-detected silence regions, or
+        ``None`` when audio detection was unavailable.  Callers can use
+        this to compute per-segment energy overlap for scoring.
     """
     transcript_silences = derive_silence_from_words(words, min_silence)
 
     try:
         audio_silences = detect_silence_ffmpeg(video_path, noise_db, min_silence)
         if audio_silences:
-            return cross_validate_silence(transcript_silences, audio_silences)
+            validated = cross_validate_silence(transcript_silences, audio_silences)
+            return validated, audio_silences
     except Exception:
         pass
 
-    return transcript_silences
+    return transcript_silences, None
