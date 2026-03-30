@@ -368,6 +368,36 @@ export function Timeline({
     [duration, playerRef, setCurrentTime],
   );
 
+  // Drag-scrub: mousedown starts, mousemove continues, mouseup ends
+  const scrubFromEvent = useCallback(
+    (clientX: number, target: HTMLElement) => {
+      if (duration <= 0) return;
+      const rect = target.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const newTime = pct * duration;
+      if (playerRef.current) playerRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    },
+    [duration, playerRef, setCurrentTime],
+  );
+
+  const handleTimelineMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (duration <= 0) return;
+      const target = e.currentTarget;
+      scrubFromEvent(e.clientX, target);
+
+      const handleMove = (ev: MouseEvent) => scrubFromEvent(ev.clientX, target);
+      const handleUp = () => {
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleUp);
+      };
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleUp);
+    },
+    [duration, scrubFromEvent],
+  );
+
   const renderCutRegions = () =>
     steps.map((step) => {
       if (duration <= 0 || step.status !== "approved") return null;
@@ -604,15 +634,28 @@ export function Timeline({
         >
           {/* Inner zoom container */}
           <div
-            className="flex flex-col min-h-0 flex-1"
+            className="flex flex-col min-h-0 flex-1 relative"
             style={{ width: zoomWidth, minWidth: "100%" }}
           >
+            {/* Playhead — spans all tracks */}
+            <div
+              ref={playheadRef}
+              className="absolute top-0 bottom-0 z-20 pointer-events-none"
+              style={{
+                left: 0,
+                width: 2,
+                background: "var(--playhead)",
+                boxShadow: "0 0 6px var(--playhead)",
+                borderRadius: 1,
+              }}
+            />
+
             {/* Main video track */}
             <div className="flex-1 min-h-0">
               <div
                 className="relative cursor-pointer h-full"
                 style={{ padding: "4px 0" }}
-                onClick={handleTimelineClick}
+                onMouseDown={handleTimelineMouseDown}
               >
                 <div
                   className="relative h-full overflow-hidden"
@@ -644,18 +687,6 @@ export function Timeline({
                     />
                   ))}
                   {renderCutRegions()}
-                  {/* Playhead */}
-                  <div
-                    ref={playheadRef}
-                    className="absolute top-0 bottom-0 z-20 pointer-events-none"
-                    style={{
-                      left: 0,
-                      width: 2,
-                      background: "var(--playhead)",
-                      boxShadow: "0 0 6px var(--playhead)",
-                      borderRadius: 1,
-                    }}
-                  />
                 </div>
               </div>
             </div>
@@ -670,7 +701,7 @@ export function Timeline({
               <div
                 className="relative cursor-pointer h-full"
                 style={{ padding: "4px 0" }}
-                onClick={handleTimelineClick}
+                onMouseDown={handleTimelineMouseDown}
               >
                 <div
                   className="relative h-full overflow-hidden"
