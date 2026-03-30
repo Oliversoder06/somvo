@@ -1,3 +1,4 @@
+import re
 from uuid import uuid4
 
 from lib.edit_decision import (
@@ -201,10 +202,18 @@ def generate_cut_list(
     # ------------------------------------------------------------------
     pacing_steps = optimize_pacing(words, steps, max_gap=max_pacing_gap)
     for ps in pacing_steps:
-        # Extract original gap size from the reason string for logging
+        # Extract original gap size and target from the reason string
+        # Reason format: "Pacing: {gap_dur:.2f}s gap → ~{target}s"
+        _m = re.search(r"(\d+\.\d+)s gap .* ~(\d+\.\d+)s", ps.reason)
+        if _m:
+            gap_before = float(_m.group(1))
+            gap_after = float(_m.group(2))
+        else:
+            gap_before = ps.end_time - ps.start_time
+            gap_after = max_pacing_gap
         log.pacing_trimmed(ps.start_time, ps.end_time,
-                           gap_before=ps.end_time - ps.start_time,
-                           gap_after=max_pacing_gap)
+                           gap_before=gap_before,
+                           gap_after=gap_after)
     steps.extend(pacing_steps)
 
     # ------------------------------------------------------------------

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2,
@@ -64,6 +64,9 @@ export function AgentPanel({
   const setPipelineVersion = useEditorStore((s) => s.setPipelineVersion);
 
   const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmProgress, setConfirmProgress] = useState(0);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -98,10 +101,52 @@ export function AgentPanel({
   const approvedCount = steps.filter((s) => s.status === "approved").length;
   const finalDuration = duration - totalRemoved;
 
+  // Simulated progress: accelerates to ~30%, crawls to ~90%, waits for real completion
+  const startProgress = useCallback(() => {
+    setConfirmProgress(0);
+    setConfirmError(null);
+    let elapsed = 0;
+    progressRef.current = setInterval(() => {
+      elapsed += 100;
+      setConfirmProgress((prev) => {
+        if (prev >= 92) return 92; // cap until real response
+        // Fast phase: 0-35% in ~1.5s
+        if (prev < 35) return prev + 2.2;
+        // Medium phase: 35-65% in ~3s
+        if (prev < 65) return prev + 0.8;
+        // Slow crawl: 65-92%
+        return prev + 0.15;
+      });
+    }, 100);
+  }, []);
+
+  const stopProgress = useCallback((success: boolean) => {
+    if (progressRef.current) {
+      clearInterval(progressRef.current);
+      progressRef.current = null;
+    }
+    if (success) {
+      // Smooth fill to 100%
+      setConfirmProgress(100);
+    } else {
+      setConfirmProgress(0);
+    }
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (progressRef.current) clearInterval(progressRef.current);
+    };
+  }, []);
+
   async function handleConfirm() {
+    if (isConfirming) return; // guard against double-click
     const approvedSteps = steps.filter((s) => s.status === "approved");
     const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     setIsConfirming(true);
+    setConfirmError(null);
+    startProgress();
     try {
       const res = await fetch(`${apiUrl}/api/execute`, {
         method: "POST",
@@ -118,10 +163,18 @@ export function AgentPanel({
         }),
       });
       if (res.ok) {
+        stopProgress(true);
+        // Brief pause at 100% before transitioning
+        await new Promise((r) => setTimeout(r, 500));
         setStatus("done");
+      } else {
+        const detail = await res.text().catch(() => "Unknown error");
+        stopProgress(false);
+        setConfirmError(`Failed (${res.status})`);
       }
-    } catch {
-      // Network error
+    } catch (err) {
+      stopProgress(false);
+      setConfirmError("Network error — check connection");
     } finally {
       setIsConfirming(false);
     }
@@ -626,13 +679,30 @@ export function AgentPanel({
             borderTop: "1px solid var(--bg-border)",
           }}
         >
+          {confirmError && (
+            <div
+              style={{
+                fontSize: 10,
+                fontFamily: "var(--font-mono)",
+                color: "#ef4444",
+                marginBottom: 6,
+                textAlign: "center",
+              }}
+            >
+              {confirmError}
+            </div>
+          )}
           <button
             onClick={handleConfirm}
             disabled={!hasApproved || isConfirming}
             style={{
               width: "100%",
+              position: "relative",
+              overflow: "hidden",
               background: hasApproved
-                ? "linear-gradient(135deg, var(--accent-from), var(--accent-to))"
+                ? isConfirming
+                  ? "var(--bg-elevated)"
+                  : "linear-gradient(135deg, var(--accent-from), var(--accent-to))"
                 : "var(--bg-elevated)",
               color: hasApproved ? "#fff" : "var(--text-muted)",
               fontFamily: "var(--font-display)",
@@ -643,24 +713,92 @@ export function AgentPanel({
               borderRadius: 8,
               textAlign: "center",
               cursor: hasApproved && !isConfirming ? "pointer" : "not-allowed",
-              border: hasApproved ? "none" : "1px solid var(--bg-border)",
+              border: hasApproved
+                ? isConfirming
+                  ? "1px solid rgba(255,255,255,.06)"
+                  : "none"
+                : "1px solid var(--bg-border)",
               opacity: hasApproved ? 1 : 0.5,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: 6,
-              boxShadow: hasApproved ? "0 0 20px rgba(255,106,82,.2)" : "none",
-              transition: "all 150ms ease",
+              boxShadow: hasApproved
+                ? isConfirming
+                  ? `0 0 ${12 + confirmProgress * 0.2}px rgba(255,106,82,${0.15 + confirmProgress * 0.003})`
+                  : "0 0 20px rgba(255,106,82,.2)"
+                : "none",
+              transition: "all 200ms ease",
+              isolation: "isolate",
             }}
           >
-            {isConfirming ? (
-              <>
-                <Loader2 size={13} strokeWidth={1.5} className="animate-spin" />
-                Processing...
-              </>
-            ) : (
-              "Confirm edits"
+            {/* Animated gradient fill */}
+            {isConfirming && (
+              <motion.div
+                initial={{ width: "0%" }}
+                animate={{ width: `${confirmProgress}%` }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  background:
+                    "linear-gradient(135deg, var(--accent-from), var(--accent-to))",
+                  borderRadius: 8,
+                  zIndex: 0,
+                }}
+              />
             )}
+            {/* 100% complete shimmer */}
+            {isConfirming && confirmProgress >= 100 && (
+              <motion.div
+                initial={{ x: "-100%", opacity: 0.4 }}
+                animate={{ x: "200%", opacity: 0 }}
+                transition={{ duration: 0.8, ease: "easeInOut" }}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  width: "40%",
+                  background:
+                    "linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent)",
+                  zIndex: 1,
+                }}
+              />
+            )}
+            {/* Button content */}
+            <span
+              style={{
+                position: "relative",
+                zIndex: 2,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {isConfirming ? (
+                <>
+                  <Loader2
+                    size={13}
+                    strokeWidth={1.5}
+                    className="animate-spin"
+                    style={{ opacity: confirmProgress >= 100 ? 0 : 1 }}
+                  />
+                  {confirmProgress >= 100
+                    ? "Done!"
+                    : `Processing — ${Math.round(confirmProgress)}%`}
+                </>
+              ) : confirmProgress >= 100 ? (
+                <>
+                  <CheckCircle size={13} strokeWidth={1.5} />
+                  Done!
+                </>
+              ) : (
+                "Confirm edits"
+              )}
+            </span>
           </button>
         </div>
       )}

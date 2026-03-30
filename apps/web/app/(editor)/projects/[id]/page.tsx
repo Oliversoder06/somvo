@@ -92,7 +92,7 @@ export default function EditorPage() {
         .eq("project_id", id)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       if (data?.steps) {
         const mapped = (data.steps as unknown as EditStep[]).map((s) => ({
           ...s,

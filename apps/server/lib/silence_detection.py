@@ -120,7 +120,11 @@ def detect_silence_combined(
         audio_silences = detect_silence_ffmpeg(video_path, noise_db, min_silence)
         if audio_silences:
             validated = cross_validate_silence(transcript_silences, audio_silences)
-            return validated, audio_silences
+            # Fall back to transcript-only if cross-validation filtered
+            # out everything — likely background noise keeping energy
+            # above the threshold during speech pauses.
+            if validated:
+                return validated, audio_silences
     except Exception:
         pass
 

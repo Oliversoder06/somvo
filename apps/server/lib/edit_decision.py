@@ -26,7 +26,7 @@ class SilenceThresholds:
     shorten_target: float = 0.3
     """Target duration when shortening a silence gap."""
 
-    split_above: float = 2.0
+    split_above: float = 5.0
     """Silence longer than this marks a clip split boundary."""
 
 
