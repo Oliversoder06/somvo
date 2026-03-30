@@ -31,7 +31,7 @@ def generate_cut_list(
     filler_words: set[str] | None = None,
     silence_thresholds: SilenceThresholds | None = None,
     confidence_threshold: int = 2,
-    max_pacing_gap: float = 0.4,
+    max_pacing_gap: float = 0.7,
 ) -> tuple[list[EditStep], PipelineLog]:
     """Generate a scored, pacing-optimised edit list.
 
@@ -169,8 +169,9 @@ def generate_cut_list(
     # ------------------------------------------------------------------
     pacing_steps = optimize_pacing(words, steps, max_gap=max_pacing_gap)
     for ps in pacing_steps:
+        # Extract original gap size from the reason string for logging
         log.pacing_trimmed(ps.start_time, ps.end_time,
-                           gap_before=ps.end_time - ps.start_time + max_pacing_gap,
+                           gap_before=ps.end_time - ps.start_time,
                            gap_after=max_pacing_gap)
     steps.extend(pacing_steps)
 

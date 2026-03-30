@@ -1,7 +1,8 @@
 """Post-cut pacing optimisation.
 
 After all cut/shorten decisions are made, this module enforces a maximum
-gap between speech segments — creating fast-paced output.
+gap between speech segments — but uses variable targets to preserve
+natural rhythm instead of flattening everything to one value.
 """
 
 from __future__ import annotations
@@ -12,12 +13,34 @@ from lib.edit_decision import compute_shorten_bounds
 from lib.step_types import EditStep
 
 
+def _pacing_target(gap_dur: float) -> float:
+    """Return a natural-feeling target duration for a gap.
+
+    Instead of forcing everything to one number, use a curve:
+      gap 0.7–1.5s  → shrink to 0.5–0.6s  (gentle trim)
+      gap 1.5–3.0s  → shrink to 0.4–0.5s  (moderate trim)
+      gap > 3.0s    → shrink to 0.4s       (hard trim)
+    """
+    if gap_dur <= 1.5:
+        # Gentle: keep more of the pause (0.5–0.6s)
+        return 0.55
+    if gap_dur <= 3.0:
+        # Moderate: tighter but not robotic (0.4–0.5s)
+        return 0.45
+    # Long gaps: trim hard
+    return 0.4
+
+
 def optimize_pacing(
     words: list[dict],
     existing_steps: list[EditStep],
-    max_gap: float = 0.4,
+    max_gap: float = 0.7,
 ) -> list[EditStep]:
     """Add shorten steps so no remaining speech gap exceeds *max_gap*.
+
+    Gaps below *max_gap* are left untouched (safe zone).
+    Gaps above are trimmed to a variable target that depends on how
+    long the gap is, preserving natural speech rhythm.
 
     Parameters
     ----------
@@ -27,7 +50,7 @@ def optimize_pacing(
         Steps already generated (cuts, shortens, splits).
         Gaps already covered by these steps are skipped.
     max_gap:
-        Maximum allowed gap between speech segments after editing.
+        Gaps at or below this value are never touched.
 
     Returns
     -------
@@ -60,22 +83,23 @@ def optimize_pacing(
         if remaining <= max_gap:
             continue
 
-        # Need to remove (remaining - max_gap) more from this gap.
+        # Pick a natural target based on the original gap size
+        target = _pacing_target(gap_dur)
+
         # Find the uncovered portion and trim it.
         uncovered = _uncovered_span(gap_start, gap_end, covered)
         for u_start, u_end in uncovered:
             u_dur = u_end - u_start
-            if u_dur <= max_gap:
+            if u_dur <= target:
                 continue
-            # Shorten this uncovered sub-gap to max_gap
-            cut_start, cut_end = compute_shorten_bounds(u_start, u_end, target=max_gap)
+            cut_start, cut_end = compute_shorten_bounds(u_start, u_end, target=target)
             if cut_end <= cut_start:
                 continue
             cut_dur = cut_end - cut_start
             extra.append(EditStep(
                 id=str(uuid4()),
                 type="shorten",
-                reason=f"Pacing: trims {cut_dur:.2f}s gap to ≤{max_gap}s",
+                reason=f"Pacing: {gap_dur:.2f}s gap → ~{target}s",
                 start_time=cut_start,
                 end_time=cut_end,
                 confidence=2,

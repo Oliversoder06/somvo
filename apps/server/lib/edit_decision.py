@@ -17,13 +17,13 @@ ActionType = Literal["keep", "shorten", "cut", "split"]
 class SilenceThresholds:
     """All silence-handling thresholds in one place."""
 
-    keep_below: float = 0.3
-    """Silence shorter than this is left untouched."""
+    keep_below: float = 0.5
+    """Silence shorter than this is left untouched (natural pause)."""
 
     shorten_below: float = 0.7
     """Silence between keep_below and shorten_below is shortened."""
 
-    shorten_target: float = 0.2
+    shorten_target: float = 0.3
     """Target duration when shortening a silence gap."""
 
     split_above: float = 2.0

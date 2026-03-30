@@ -104,31 +104,15 @@ export function UploadZone() {
 
       setState({ phase: "uploading", filename: file.name, progress: 100 });
 
-      // --- step 4: update project row → processing --------------------------
+      // --- step 4: update project row → ready for user input ----------------
       const { error: updateErr } = await supabase
         .from("projects")
-        .update({ raw_url: storagePath, status: "processing" as const })
+        .update({ raw_url: storagePath, status: "ready" as const })
         .eq("id", project.id);
 
       if (updateErr) {
         setState({ phase: "error", message: updateErr.message });
         return;
-      }
-
-      // Trigger backend processing pipeline
-      try {
-        const apiUrl =
-          process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-        await fetch(`${apiUrl}/api/process`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            project_id: project.id,
-            raw_url: storagePath,
-          }),
-        });
-      } catch {
-        // Backend trigger is non-critical — pipeline may be triggered separately
       }
 
       // Extract thumbnail and duration via ffmpeg.wasm
