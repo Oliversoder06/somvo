@@ -52,11 +52,32 @@ function useWaveform(
     async function initWaveSurfer() {
       try {
         const WaveSurfer = (await import("wavesurfer.js")).default;
+
+        // Create canvas gradients for the waveform
+        const ctx = document.createElement("canvas").getContext("2d")!;
+        const waveGrad = ctx.createLinearGradient(
+          0,
+          0,
+          container!.clientWidth,
+          0,
+        );
+        waveGrad.addColorStop(0, "rgba(255, 77, 109, 0.45)");
+        waveGrad.addColorStop(1, "rgba(255, 140, 66, 0.45)");
+
+        const progressGrad = ctx.createLinearGradient(
+          0,
+          0,
+          container!.clientWidth,
+          0,
+        );
+        progressGrad.addColorStop(0, "#ff4d6d");
+        progressGrad.addColorStop(1, "#ff8c42");
+
         ws = WaveSurfer.create({
           container: container!,
           height: "auto",
-          waveColor: "var(--waveform)",
-          progressColor: "var(--waveform-act)",
+          waveColor: waveGrad,
+          progressColor: progressGrad,
           cursorWidth: 0,
           barWidth: 2,
           barGap: 1,
@@ -213,12 +234,16 @@ export function Timeline({
   const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
   const zoom = useEditorStore((s) => s.timelineZoom);
   const setZoom = useEditorStore((s) => s.setTimelineZoom);
+  const timelineHeight = useEditorStore((s) => s.timelineHeight);
+  const setTimelineHeight = useEditorStore((s) => s.setTimelineHeight);
+  const previewMode = useEditorStore((s) => s.previewMode);
 
   const waveformRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
   const rulerPlayheadRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rulerScrollRef = useRef<HTMLDivElement>(null);
+  const resizeRef = useRef<{ startY: number; startH: number } | null>(null);
 
   const [scrollLeft, setScrollLeft] = useState(0);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -355,26 +380,95 @@ export function Timeline({
           style={{
             left: `${left}%`,
             width: `${width}%`,
-            background: "var(--cut-region)",
-            borderLeft: "1px solid var(--cut-border)",
-            borderRight: "1px solid var(--cut-border)",
+            background: previewMode
+              ? "repeating-linear-gradient(-45deg, rgba(229,72,77,.45), rgba(229,72,77,.45) 4px, rgba(229,72,77,.15) 4px, rgba(229,72,77,.15) 8px)"
+              : "var(--cut-region)",
+            borderLeft: previewMode
+              ? "2px solid rgba(229,72,77,.7)"
+              : "1px solid var(--cut-border)",
+            borderRight: previewMode
+              ? "2px solid rgba(229,72,77,.7)"
+              : "1px solid var(--cut-border)",
+            opacity: 1,
+            transition: "all 200ms ease",
           }}
-        />
+        >
+          {previewMode && (
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: 0,
+                right: 0,
+                height: 2,
+                background: "rgba(229,72,77,.8)",
+                transform: "translateY(-50%)",
+              }}
+            />
+          )}
+        </div>
       );
     });
 
   const approvedCuts = steps.filter((s) => s.status === "approved").length;
   const zoomWidth = `${zoom * 100}%`;
 
+  // Drag-to-resize handler
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      resizeRef.current = { startY: e.clientY, startH: timelineHeight };
+      const handleMove = (ev: MouseEvent) => {
+        if (!resizeRef.current) return;
+        const delta = resizeRef.current.startY - ev.clientY;
+        setTimelineHeight(resizeRef.current.startH + delta);
+      };
+      const handleUp = () => {
+        resizeRef.current = null;
+        document.removeEventListener("mousemove", handleMove);
+        document.removeEventListener("mouseup", handleUp);
+      };
+      document.addEventListener("mousemove", handleMove);
+      document.addEventListener("mouseup", handleUp);
+    },
+    [timelineHeight, setTimelineHeight],
+  );
+
   return (
     <div
       className="shrink-0 flex flex-col"
       style={{
-        height: 160,
+        height: timelineHeight,
         background: "var(--timeline-bg)",
         borderTop: "1px solid var(--bg-border)",
+        position: "relative",
       }}
     >
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        style={{
+          position: "absolute",
+          top: -2,
+          left: 0,
+          right: 0,
+          height: 5,
+          cursor: "row-resize",
+          zIndex: 20,
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 3,
+            borderRadius: 2,
+            background: "var(--bg-border)",
+            margin: "1px auto 0",
+            transition: "background 150ms ease",
+          }}
+        />
+      </div>
+
       {/* Timecode ruler */}
       <div
         className="shrink-0 flex"

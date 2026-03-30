@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Loader2 } from "lucide-react";
+import { Loader2, PanelRightOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useEditorStore, type EditStep } from "@/lib/store/editor";
 import { VideoPreview } from "@/components/editor/video-preview";
@@ -29,9 +29,10 @@ export default function EditorPage() {
   const addAgentMessage = useEditorStore((s) => s.addAgentMessage);
   const setAgentState = useEditorStore((s) => s.setAgentState);
   const clearSteps = useEditorStore((s) => s.clearSteps);
-  const agentState = useEditorStore((s) => s.agentState);
 
   const [prompt, setPrompt] = useState("");
+  const agentPanelOpen = useEditorStore((s) => s.agentPanelOpen);
+  const toggleAgentPanel = useEditorStore((s) => s.toggleAgentPanel);
 
   // Fetch project data
   const { data: project, isLoading } = useQuery({
@@ -189,8 +190,6 @@ export default function EditorPage() {
     [playerRef, setCurrentTime],
   );
 
-  const isStreaming = agentState === "streaming";
-
   if (isLoading) {
     return (
       <div
@@ -226,6 +225,7 @@ export default function EditorPage() {
         height: "100%",
         background: "var(--bg-base)",
         overflow: "hidden",
+        position: "relative",
       }}
     >
       {/* Left icon sidebar */}
@@ -245,13 +245,40 @@ export default function EditorPage() {
         <Timeline playerRef={playerRef} />
       </div>
 
-      {/* Right director/agent panel - full height */}
+      {/* Right director/agent panel - full height, collapsible */}
       <AgentPanel
         onSeek={handleSeek}
         prompt={prompt}
         setPrompt={setPrompt}
         onSubmitPrompt={handleSubmitPrompt}
       />
+
+      {/* Collapsed panel open button */}
+      {!agentPanelOpen && (
+        <button
+          onClick={toggleAgentPanel}
+          title="Open Director panel"
+          style={{
+            position: "absolute",
+            top: 60,
+            right: 12,
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            border: "1px solid var(--bg-border)",
+            background: "var(--bg-surface)",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10,
+            transition: "all 150ms ease",
+          }}
+        >
+          <PanelRightOpen size={14} strokeWidth={1.5} />
+        </button>
+      )}
     </div>
   );
 }

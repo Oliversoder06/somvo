@@ -36,12 +36,52 @@ export function VideoPreview({
     <div
       className="flex-1 relative flex items-center justify-center overflow-hidden"
       style={{
-        borderRadius: 8,
         background: "#000",
-        border: "1px solid rgba(255,255,255,.04)",
-        margin: 8,
       }}
     >
+      {/* Preview mode badge */}
+      {previewMode && videoUrl && (
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 12,
+            zIndex: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "rgba(255,106,82,.15)",
+            border: "1px solid rgba(255,106,82,.3)",
+            borderRadius: 6,
+            padding: "4px 10px",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: "var(--accent)",
+              boxShadow: "0 0 6px var(--accent)",
+              animation: "pulse 1.4s ease-in-out infinite",
+            }}
+          />
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 10,
+              fontWeight: 600,
+              color: "var(--accent)",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
+            Preview — cuts skipped
+          </span>
+        </div>
+      )}
+
       {videoUrl && (
         <video
           key={videoUrl}

@@ -12,10 +12,20 @@ export function EditorShell({
   return (
     <div
       className="flex flex-col overflow-hidden"
-      style={{ height: "100vh", background: "var(--bg-base)" }}
+      style={{
+        height: "100vh",
+        background: "var(--bg-base)",
+        position: "relative",
+      }}
     >
+      <div className="editor-glow" />
       <EditorTopbar />
-      <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+      <div
+        className="flex-1 min-h-0 overflow-hidden"
+        style={{ position: "relative", zIndex: 1 }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

@@ -23,12 +23,13 @@ export function EditorTopbar() {
     >
       {/* Left: Back */}
       <Link
-        href="/"
+        href="/projects"
         className="flex items-center gap-1.5 editor-back-link"
         style={{
           color: "var(--text-muted)",
           textDecoration: "none",
           transition: "color 150ms ease",
+          flexShrink: 0,
         }}
       >
         <ChevronLeft size={15} strokeWidth={1.5} />
@@ -39,19 +40,19 @@ export function EditorTopbar() {
             fontWeight: 600,
           }}
         >
-          Home
+          Projects
         </span>
       </Link>
 
       {/* Centre: Filename */}
       <div
         style={{
-          position: "absolute",
-          left: "50%",
-          transform: "translateX(-50%)",
+          flex: 1,
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          justifyContent: "center",
+          overflow: "hidden",
+          padding: "0 16px",
         }}
       >
         <span
@@ -60,6 +61,9 @@ export function EditorTopbar() {
             fontSize: 13,
             fontWeight: 700,
             color: "var(--text-primary)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {filename}

@@ -37,6 +37,10 @@ interface EditorStore {
   setPreviewMode: (m: boolean) => void;
   timelineZoom: number;
   setTimelineZoom: (z: number) => void;
+  timelineHeight: number;
+  setTimelineHeight: (h: number) => void;
+  agentPanelOpen: boolean;
+  toggleAgentPanel: () => void;
   setAgentState: (s: AgentState) => void;
   addAgentMessage: (m: string) => void;
   addStep: (step: EditStep) => void;
@@ -57,6 +61,8 @@ export const useEditorStore = create<EditorStore>((set) => ({
   isPlaying: false,
   previewMode: false,
   timelineZoom: 1,
+  timelineHeight: 200,
+  agentPanelOpen: true,
 
   agentState: "idle",
   agentMessages: [],
@@ -71,6 +77,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setIsPlaying: (p) => set({ isPlaying: p }),
   setPreviewMode: (m) => set({ previewMode: m }),
   setTimelineZoom: (z) => set({ timelineZoom: Math.max(1, Math.min(20, z)) }),
+  setTimelineHeight: (h) =>
+    set({ timelineHeight: Math.max(120, Math.min(400, h)) }),
+  toggleAgentPanel: () =>
+    set((state) => ({ agentPanelOpen: !state.agentPanelOpen })),
   setAgentState: (s) => set({ agentState: s }),
   addAgentMessage: (m) =>
     set((state) => ({ agentMessages: [...state.agentMessages, m] })),

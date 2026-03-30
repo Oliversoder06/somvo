@@ -62,11 +62,17 @@ export function TransportBar({
     <div
       className="shrink-0 flex items-center justify-between"
       style={{
-        height: 40,
+        height: 48,
         background: "var(--bg-surface)",
-        borderTop: "1px solid var(--bg-border)",
+        borderTop: previewMode
+          ? "1px solid rgba(255,106,82,.35)"
+          : "1px solid var(--bg-border)",
         borderBottom: "1px solid var(--bg-border)",
-        padding: "0 12px",
+        padding: "0 16px",
+        boxShadow: previewMode
+          ? "inset 0 1px 8px rgba(255,106,82,.08)"
+          : "none",
+        transition: "border-top 200ms ease, box-shadow 200ms ease",
       }}
     >
       {/* Left: Preview toggle + timecode */}
@@ -75,25 +81,47 @@ export function TransportBar({
           className="flex items-center"
           style={{
             background: "var(--bg-elevated)",
-            borderRadius: 6,
-            padding: 2,
+            borderRadius: 8,
+            padding: 3,
             border: "1px solid var(--bg-border)",
+            position: "relative",
           }}
         >
+          {/* Sliding indicator */}
+          <div
+            style={{
+              position: "absolute",
+              top: 3,
+              left: previewMode ? "calc(50% + 1px)" : 3,
+              width: "calc(50% - 4px)",
+              height: "calc(100% - 6px)",
+              borderRadius: 5,
+              background: previewMode
+                ? "linear-gradient(135deg, var(--accent-from), var(--accent-to))"
+                : "rgba(255,255,255,.1)",
+              boxShadow: previewMode
+                ? "0 0 12px rgba(255,106,82,.25)"
+                : "0 1px 2px rgba(0,0,0,.3)",
+              transition:
+                "left 200ms ease, background 200ms ease, box-shadow 200ms ease",
+              zIndex: 0,
+            }}
+          />
           <button
             onClick={() => setPreviewMode(false)}
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: 10,
-              padding: "3px 8px",
-              borderRadius: 4,
+              fontWeight: !previewMode ? 600 : 400,
+              padding: "5px 12px",
+              borderRadius: 5,
               border: "none",
               cursor: "pointer",
-              background: !previewMode
-                ? "rgba(255,255,255,.08)"
-                : "transparent",
+              background: "transparent",
               color: !previewMode ? "var(--text-primary)" : "var(--text-muted)",
-              transition: "all 120ms ease",
+              transition: "all 150ms ease",
+              position: "relative",
+              zIndex: 1,
             }}
           >
             Original
@@ -103,13 +131,16 @@ export function TransportBar({
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: 10,
-              padding: "3px 8px",
-              borderRadius: 4,
+              fontWeight: previewMode ? 600 : 400,
+              padding: "5px 12px",
+              borderRadius: 5,
               border: "none",
               cursor: "pointer",
-              background: previewMode ? "rgba(255,106,82,.1)" : "transparent",
-              color: previewMode ? "var(--accent)" : "var(--text-muted)",
-              transition: "all 120ms ease",
+              background: "transparent",
+              color: previewMode ? "#fff" : "var(--text-muted)",
+              transition: "all 150ms ease",
+              position: "relative",
+              zIndex: 1,
             }}
           >
             Preview

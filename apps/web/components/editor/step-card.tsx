@@ -125,6 +125,23 @@ export function StepCard({
         >
           {dur}s
         </div>
+        {step.reason && (
+          <div
+            style={{
+              fontFamily: "var(--font-body)",
+              fontSize: 11,
+              color: "var(--text-secondary)",
+              lineHeight: 1.4,
+              marginTop: 3,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical" as const,
+              overflow: "hidden",
+            }}
+          >
+            {step.reason}
+          </div>
+        )}
       </div>
     </div>
   );

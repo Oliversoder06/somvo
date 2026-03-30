@@ -12,6 +12,8 @@ import {
   XCircle,
   ArrowUp,
   MessageSquare,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
 import { StepCard } from "./step-card";
@@ -54,6 +56,8 @@ export function AgentPanel({
   const projectId = useEditorStore((s) => s.projectId);
   const setStatus = useEditorStore((s) => s.setStatus);
   const duration = useEditorStore((s) => s.duration);
+  const agentPanelOpen = useEditorStore((s) => s.agentPanelOpen);
+  const toggleAgentPanel = useEditorStore((s) => s.toggleAgentPanel);
 
   const [isConfirming, setIsConfirming] = useState(false);
 
@@ -108,13 +112,16 @@ export function AgentPanel({
     <div
       className="flex flex-col h-full"
       style={{
-        width: 320,
-        minWidth: 320,
+        width: agentPanelOpen ? 320 : 0,
+        minWidth: agentPanelOpen ? 320 : 0,
         background: "var(--bg-surface)",
-        borderLeft: "1px solid var(--bg-border)",
+        borderLeft: agentPanelOpen ? "1px solid var(--bg-border)" : "none",
+        transition: "width 200ms ease, min-width 200ms ease",
+        overflow: "hidden",
+        position: "relative",
       }}
     >
-      {/* Header - like Cardboard's "Director / Ready" */}
+      {/* Header */}
       <div
         style={{
           padding: "12px 16px",
@@ -122,8 +129,22 @@ export function AgentPanel({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          position: "relative",
         }}
       >
+        {/* Gradient accent line */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 1,
+            background:
+              "linear-gradient(90deg, var(--accent-from), var(--accent-to))",
+            opacity: 0.3,
+          }}
+        />
         <span
           style={{
             fontFamily: "var(--font-display)",
@@ -156,6 +177,26 @@ export function AgentPanel({
           >
             {isStreaming ? "Analysing" : "Ready"}
           </span>
+          <button
+            onClick={toggleAgentPanel}
+            title="Close Director panel"
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              border: "none",
+              background: "transparent",
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginLeft: 4,
+              transition: "all 120ms ease",
+            }}
+          >
+            <PanelRightClose size={13} strokeWidth={1.5} />
+          </button>
         </div>
       </div>
 
@@ -288,58 +329,31 @@ export function AgentPanel({
               }}
             >
               <div
-                className="flex items-center gap-3"
+                className="flex items-center gap-2 flex-wrap"
                 style={{ marginBottom: 8 }}
               >
-                <div className="flex items-center gap-1.5">
-                  <Clock
-                    size={11}
-                    strokeWidth={1.5}
-                    style={{ color: "var(--accent)" }}
-                  />
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 11,
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {totalRemoved.toFixed(1)}s
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 10,
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    removed
-                  </span>
-                </div>
-                <div
+                <span
+                  className="badge"
                   style={{
-                    width: 1,
-                    height: 10,
-                    background: "var(--bg-border)",
+                    background: "rgba(255,106,82,.1)",
+                    color: "var(--accent)",
+                    border: "1px solid rgba(255,106,82,.15)",
                   }}
-                />
-                <div className="flex items-center gap-1.5">
-                  <Scissors
-                    size={11}
-                    strokeWidth={1.5}
-                    style={{ color: "var(--text-muted)" }}
-                  />
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: 10,
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    {approvedCount} cuts
-                  </span>
-                </div>
+                >
+                  <Clock size={9} strokeWidth={1.5} />
+                  {totalRemoved.toFixed(1)}s removed
+                </span>
+                <span
+                  className="badge"
+                  style={{
+                    background: "rgba(62,207,142,.1)",
+                    color: "var(--success)",
+                    border: "1px solid rgba(62,207,142,.15)",
+                  }}
+                >
+                  <Scissors size={9} strokeWidth={1.5} />
+                  {approvedCount} cuts
+                </span>
               </div>
               <div
                 style={{

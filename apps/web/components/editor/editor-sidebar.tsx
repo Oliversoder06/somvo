@@ -12,12 +12,29 @@ import {
 } from "lucide-react";
 
 const tools = [
-  { id: "select", icon: MousePointer2, label: "Select", shortcut: "V" },
-  { id: "cut", icon: Scissors, label: "Cut mode", shortcut: "C" },
-  { id: "text", icon: Type, label: "Captions" },
-  { id: "music", icon: Music, label: "Music" },
-  { id: "audio", icon: Volume2, label: "Audio" },
-  { id: "effects", icon: Wand2, label: "Effects" },
+  {
+    id: "select",
+    icon: MousePointer2,
+    label: "Select",
+    shortcut: "V",
+    enabled: true,
+  },
+  {
+    id: "cut",
+    icon: Scissors,
+    label: "Cut mode",
+    shortcut: "C",
+    enabled: true,
+  },
+  { id: "text", icon: Type, label: "Captions — Coming soon", enabled: false },
+  { id: "music", icon: Music, label: "Music — Coming soon", enabled: false },
+  { id: "audio", icon: Volume2, label: "Audio — Coming soon", enabled: false },
+  {
+    id: "effects",
+    icon: Wand2,
+    label: "Effects — Coming soon",
+    enabled: false,
+  },
 ] as const;
 
 export function EditorSidebar() {
@@ -39,10 +56,11 @@ export function EditorSidebar() {
         {tools.map((tool) => {
           const Icon = tool.icon;
           const isActive = active === tool.id;
+          const isEnabled = tool.enabled;
           return (
             <button
               key={tool.id}
-              onClick={() => setActive(tool.id)}
+              onClick={() => isEnabled && setActive(tool.id)}
               title={tool.label}
               className="sidebar-tool-btn"
               style={{
@@ -50,14 +68,22 @@ export function EditorSidebar() {
                 height: 34,
                 borderRadius: 8,
                 border: "none",
-                background: isActive ? "rgba(255,255,255,.08)" : "transparent",
-                color: isActive ? "var(--text-primary)" : "var(--text-muted)",
-                cursor: "pointer",
+                background:
+                  isActive && isEnabled
+                    ? "rgba(255,255,255,.08)"
+                    : "transparent",
+                color: !isEnabled
+                  ? "var(--text-muted)"
+                  : isActive
+                    ? "var(--text-primary)"
+                    : "var(--text-muted)",
+                cursor: isEnabled ? "pointer" : "default",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 transition: "all 120ms ease",
                 position: "relative",
+                opacity: isEnabled ? 1 : 0.3,
               }}
             >
               <Icon size={16} strokeWidth={1.5} />
