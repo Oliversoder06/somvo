@@ -8,7 +8,12 @@ from pydantic import BaseModel
 
 from lib.step_types import EditStep
 from lib.supabase import get_supabase
-from modal_app.ffmpeg_utils import cut_silence, burn_captions, apply_watermark, cap_resolution
+from modal_app.ffmpeg_utils import (
+    burn_captions,
+    apply_watermark,
+    cap_resolution,
+    execute_edit_steps,
+)
 
 router = APIRouter()
 
@@ -50,17 +55,21 @@ async def execute_edits(req: ExecuteRequest):
 
         current_path = video_path
 
-        # Collect silence/filler cuts
-        cut_segments = [
-            {"start": s.start_time, "end": s.end_time}
+        # Apply all cut / shorten / split steps via the smart executor
+        edit_steps = [
+            {
+                "type": s.type,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+            }
             for s in req.approved_steps
-            if s.type in ("cut_silence", "cut_filler", "trim")
+            if s.type in ("cut_silence", "cut_filler", "shorten", "split", "trim")
         ]
 
-        if cut_segments:
-            cut_output = os.path.join(work_dir, "cut.mp4")
-            cut_silence(current_path, cut_segments, cut_output)
-            current_path = cut_output
+        clip_paths: list[str] = [video_path]
+        if edit_steps:
+            clip_paths = execute_edit_steps(video_path, edit_steps, work_dir)
+            current_path = clip_paths[0]
 
         # Burn captions if any caption steps approved
         caption_steps = [s for s in req.approved_steps if s.type == "caption"]
@@ -99,14 +108,26 @@ async def execute_edits(req: ExecuteRequest):
             cap_resolution(current_path, capped_output, max_height=720)
             current_path = capped_output
 
-        # Upload processed video to Supabase Storage
+        # Upload processed video(s) to Supabase Storage
+        # If multiple clips from split, upload each; primary is clip 0
         storage_path = f"{user_id}/{req.project_id}/output.mp4"
-        with open(current_path, "rb") as f:
-            supabase.storage.from_("processed").upload(
-                storage_path,
-                f.read(),
-                file_options={"content-type": "video/mp4", "upsert": "true"},
-            )
+        if len(clip_paths) > 1:
+            for i, cp in enumerate(clip_paths):
+                clip_storage = f"{user_id}/{req.project_id}/clip_{i}.mp4"
+                with open(cp, "rb") as f:
+                    supabase.storage.from_("processed").upload(
+                        clip_storage,
+                        f.read(),
+                        file_options={"content-type": "video/mp4", "upsert": "true"},
+                    )
+            storage_path = f"{user_id}/{req.project_id}/clip_0.mp4"
+        else:
+            with open(current_path, "rb") as f:
+                supabase.storage.from_("processed").upload(
+                    storage_path,
+                    f.read(),
+                    file_options={"content-type": "video/mp4", "upsert": "true"},
+                )
 
         # Update project status
         supabase.table("projects").update({

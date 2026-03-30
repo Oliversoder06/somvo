@@ -52,7 +52,7 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
         silences = detect_silence_combined(video_path, transcript["words"])
 
         # 4. Generate cut list
-        steps = generate_cut_list(silences, transcript, duration)
+        steps, pipeline_log = generate_cut_list(silences, transcript, duration)
 
         # 5. Store transcript in Supabase
         supabase.table("transcripts").insert(
@@ -63,7 +63,7 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
             }
         ).execute()
 
-        # 6. Store edit steps in Supabase
+        # 6. Store edit steps + pipeline log in Supabase
         steps_payload = [
             {
                 "id": s.id,
@@ -71,6 +71,7 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
                 "reason": s.reason,
                 "startTime": s.start_time,
                 "endTime": s.end_time,
+                "confidence": s.confidence,
                 "status": "pending",
             }
             for s in steps
@@ -79,6 +80,7 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
             {
                 "project_id": project_id,
                 "steps": steps_payload,
+                "pipeline_log": pipeline_log.summary(),
             }
         ).execute()
 

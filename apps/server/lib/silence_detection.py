@@ -2,7 +2,7 @@ import subprocess
 
 
 def derive_silence_from_words(
-    words: list[dict], min_silence: float = 0.5
+    words: list[dict], min_silence: float = 0.3
 ) -> list[dict]:
     """Derive silence segments from gaps between consecutive transcript words."""
     silences = []
@@ -94,7 +94,7 @@ def cross_validate_silence(
 def detect_silence_combined(
     video_path: str,
     words: list[dict],
-    min_silence: float = 0.5,
+    min_silence: float = 0.3,
     noise_db: float = -35.0,
 ) -> list[dict]:
     """

@@ -64,7 +64,7 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
         yield f"data: {json.dumps({'type': 'status', 'message': f'Detected {len(silences)} silence regions'})}\n\n"
 
         # Generate cut list
-        steps = generate_cut_list(silences, transcript, duration)
+        steps, pipeline_log = generate_cut_list(silences, transcript, duration)
 
         yield f"data: {json.dumps({'type': 'status', 'message': 'Proposing cuts...'})}\n\n"
 
@@ -76,9 +76,14 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
                 "reason": step.reason,
                 "startTime": step.start_time,
                 "endTime": step.end_time,
+                "confidence": step.confidence,
                 "status": "pending",
             }
             yield f"data: {json.dumps({'type': 'cut', 'step': step_dict})}\n\n"
+
+        # Stream the pipeline log summary to the frontend
+        log_summary = pipeline_log.summary()
+        yield f"data: {json.dumps({'type': 'log_summary', 'summary': log_summary})}\n\n"
 
         # Store transcript in Supabase
         supabase.table("transcripts").upsert(
@@ -90,7 +95,7 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
             on_conflict="project_id",
         ).execute()
 
-        # Store edit steps in Supabase
+        # Store edit steps + pipeline log in Supabase
         steps_payload = [
             {
                 "id": s.id,
@@ -98,15 +103,18 @@ async def analysis_stream(project_id: str, prompt: str) -> AsyncGenerator[str, N
                 "reason": s.reason,
                 "startTime": s.start_time,
                 "endTime": s.end_time,
+                "confidence": s.confidence,
                 "status": "pending",
             }
             for s in steps
         ]
-        supabase.table("edit_steps").insert(
+        supabase.table("edit_steps").upsert(
             {
                 "project_id": project_id,
                 "steps": steps_payload,
-            }
+                "pipeline_log": pipeline_log.summary(),
+            },
+            on_conflict="project_id",
         ).execute()
 
         # Update project status

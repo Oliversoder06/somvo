@@ -28,6 +28,7 @@ export default function EditorPage() {
   const addStep = useEditorStore((s) => s.addStep);
   const setAgentStatus = useEditorStore((s) => s.setAgentStatus);
   const clearAgent = useEditorStore((s) => s.clearAgent);
+  const setPipelineLog = useEditorStore((s) => s.setPipelineLog);
 
   const [prompt, setPrompt] = useState("");
 
@@ -154,6 +155,9 @@ export default function EditorPage() {
                 status: "pending" as const,
               });
             }
+            if (event.type === "log_summary") {
+              setPipelineLog(event.summary);
+            }
             if (event.type === "done") {
               setAgentStatus(null);
             }
@@ -165,7 +169,7 @@ export default function EditorPage() {
     } catch {
       setAgentStatus(null);
     }
-  }, [prompt, id, clearAgent, setAgentStatus, addStep]);
+  }, [prompt, id, clearAgent, setAgentStatus, addStep, setPipelineLog]);
 
   // Keyboard shortcuts
   useHotkeys(

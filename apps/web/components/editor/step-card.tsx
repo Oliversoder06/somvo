@@ -14,6 +14,8 @@ function formatTimestamp(seconds: number) {
 const TYPE_LABELS: Record<string, string> = {
   cut_silence: "CUT SILENCE",
   cut_filler: "CUT FILLER",
+  shorten: "SHORTEN",
+  split: "SPLIT",
   trim: "TRIM",
   caption: "CAPTION",
 };
@@ -50,7 +52,12 @@ export function StepCard({ step, index }: { step: EditStep; index: number }) {
 
       {/* Reason */}
       <p className="text-[12px] text-fg-secondary leading-[1.6] mb-2.5 pl-7">
-        Removes {timeDiff}s of silence
+        {step.reason}
+        {step.confidence != null && (
+          <span className="ml-1.5 text-fg-muted font-mono text-[10px]">
+            score {step.confidence}
+          </span>
+        )}
       </p>
 
       {/* Action buttons */}

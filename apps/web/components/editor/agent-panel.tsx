@@ -2,8 +2,15 @@
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCheck, XCircle, Loader2, Download } from "lucide-react";
+import {
+  CheckCheck,
+  XCircle,
+  Loader2,
+  Download,
+  ChevronDown,
+} from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
+import type { PipelineLogSummary } from "@/lib/store/editor";
 import { createClient } from "@/lib/supabase/client";
 import { StepCard } from "./step-card";
 
@@ -29,9 +36,11 @@ export function AgentPanel() {
   const setStatus = useEditorStore((s) => s.setStatus);
   const duration = useEditorStore((s) => s.duration);
   const status = useEditorStore((s) => s.status);
+  const pipelineLog = useEditorStore((s) => s.pipelineLog);
 
   const [isConfirming, setIsConfirming] = useState(false);
   const [processedUrl, setProcessedUrl] = useState<string | null>(null);
+  const [logExpanded, setLogExpanded] = useState(false);
 
   const hasApproved = steps.some((s) => s.status === "approved");
 
@@ -193,6 +202,43 @@ export function AgentPanel() {
               </AnimatePresence>
             </motion.div>
           </>
+        )}
+
+        {/* Pipeline log summary */}
+        {pipelineLog && hasSteps && (
+          <div className="mt-3 border border-border rounded-md overflow-hidden">
+            <button
+              onClick={() => setLogExpanded((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2 text-[11px] font-display font-medium text-fg-muted hover:text-fg-secondary transition-colors"
+            >
+              <span>Pipeline log · {pipelineLog.entry_count} decisions</span>
+              <ChevronDown
+                size={12}
+                strokeWidth={1.5}
+                className={`transition-transform ${logExpanded ? "rotate-180" : ""}`}
+              />
+            </button>
+            {logExpanded && (
+              <div className="px-3 pb-2.5 flex flex-col gap-1">
+                {Object.entries(pipelineLog.counts).map(([key, count]) => {
+                  const [phase, action] = key.split(".");
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between font-mono text-[10px] text-fg-muted"
+                    >
+                      <span>
+                        <span className="text-fg-secondary">{phase}</span>
+                        <span className="mx-1">·</span>
+                        {action}
+                      </span>
+                      <span className="tabular-nums">{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

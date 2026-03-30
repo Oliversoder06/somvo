@@ -9,11 +9,17 @@ export type ProjectStatus =
 
 export type EditStep = {
   id: string;
-  type: "cut_silence" | "cut_filler" | "trim" | "caption";
+  type: "cut_silence" | "cut_filler" | "shorten" | "split" | "trim" | "caption";
   reason: string;
   startTime: number;
   endTime: number;
+  confidence?: number | null;
   status: "pending" | "approved" | "rejected";
+};
+
+export type PipelineLogSummary = {
+  entry_count: number;
+  counts: Record<string, number>;
 };
 
 interface EditorState {
@@ -30,6 +36,9 @@ interface EditorState {
 
   // Steps
   steps: EditStep[];
+
+  // Pipeline log
+  pipelineLog: PipelineLogSummary | null;
 
   // Playback
   currentTime: number;
@@ -57,6 +66,9 @@ interface EditorState {
   approveAll: () => void;
   rejectAll: () => void;
 
+  // Log actions
+  setPipelineLog: (log: PipelineLogSummary) => void;
+
   // Playback actions
   setCurrentTime: (time: number) => void;
   setIsPlaying: (playing: boolean) => void;
@@ -77,6 +89,9 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   // Steps
   steps: [],
+
+  // Pipeline log
+  pipelineLog: null,
 
   // Playback
   currentTime: 0,
@@ -102,7 +117,8 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => ({
       agentMessages: [...state.agentMessages, message],
     })),
-  clearAgent: () => set({ agentStatus: null, agentMessages: [], steps: [] }),
+  clearAgent: () =>
+    set({ agentStatus: null, agentMessages: [], steps: [], pipelineLog: null }),
 
   // Step actions
   addStep: (step) => set((state) => ({ steps: [...state.steps, step] })),
@@ -133,6 +149,9 @@ export const useEditorStore = create<EditorState>((set) => ({
     set((state) => ({
       steps: state.steps.map((s) => ({ ...s, status: "rejected" as const })),
     })),
+
+  // Log actions
+  setPipelineLog: (log) => set({ pipelineLog: log }),
 
   // Playback actions
   setCurrentTime: (time) => set({ currentTime: time }),

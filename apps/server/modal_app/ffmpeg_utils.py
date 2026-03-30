@@ -1,4 +1,7 @@
 import ffmpeg
+import os
+import shutil
+import tempfile
 
 
 def extract_audio(video_path: str, output_path: str) -> str:
@@ -16,7 +19,6 @@ def extract_audio(video_path: str, output_path: str) -> str:
 def cut_silence(video_path: str, silence_segments: list[dict], output_path: str) -> str:
     """Remove silence segments from a video using per-segment seek + concat."""
     if not silence_segments:
-        import shutil
         shutil.copy2(video_path, output_path)
         return output_path
 
@@ -34,7 +36,6 @@ def cut_silence(video_path: str, silence_segments: list[dict], output_path: str)
         keep.append((prev, duration))
 
     if not keep:
-        import shutil
         shutil.copy2(video_path, output_path)
         return output_path
 
@@ -94,7 +95,6 @@ def cap_resolution(video_path: str, output_path: str, max_height: int = 720) -> 
         (s for s in probe["streams"] if s["codec_type"] == "video"), None
     )
     if video_stream and int(video_stream.get("height", 0)) <= max_height:
-        import shutil
         shutil.copy2(video_path, output_path)
         return output_path
 
@@ -130,4 +130,163 @@ def concat_segments(segment_paths: list[str], output_path: str) -> str:
     )
 
     os.remove(list_file)
+    return output_path
+
+
+# ---------------------------------------------------------------------------
+# Smart edit execution (supports cut / shorten / split)
+# ---------------------------------------------------------------------------
+
+def execute_edit_steps(
+    video_path: str,
+    steps: list[dict],
+    work_dir: str,
+) -> list[str]:
+    """Apply approved edit steps and return paths to output clip(s).
+
+    Parameters
+    ----------
+    video_path : str
+        Path to the source video.
+    steps : list[dict]
+        Each dict must have ``type``, ``start_time``, ``end_time``.
+        Types handled: ``cut_silence``, ``cut_filler``, ``shorten``, ``split``, ``trim``.
+    work_dir : str
+        Temporary directory for intermediate files.
+
+    Returns
+    -------
+    list[str]
+        One path per output clip.  Usually a single item unless split
+        boundaries were present.
+    """
+    probe = ffmpeg.probe(video_path)
+    duration = float(probe["format"]["duration"])
+
+    # Separate split boundaries from removal segments
+    removals: list[tuple[float, float]] = []
+    split_points: list[float] = []
+
+    for s in sorted(steps, key=lambda x: x["start_time"]):
+        stype = s["type"]
+        if stype == "split":
+            # The midpoint of the split silence is the boundary
+            mid = (s["start_time"] + s["end_time"]) / 2
+            split_points.append(mid)
+            # Also remove the silence itself
+            removals.append((s["start_time"], s["end_time"]))
+        elif stype in ("cut_silence", "cut_filler", "shorten", "trim"):
+            removals.append((s["start_time"], s["end_time"]))
+
+    # Merge overlapping removals
+    removals.sort()
+    merged_removals: list[tuple[float, float]] = []
+    for start, end in removals:
+        if merged_removals and start <= merged_removals[-1][1]:
+            merged_removals[-1] = (merged_removals[-1][0], max(merged_removals[-1][1], end))
+        else:
+            merged_removals.append((start, end))
+
+    # Build keep segments (inverse of removals)
+    keep: list[tuple[float, float]] = []
+    prev = 0.0
+    for rs, re in merged_removals:
+        if rs > prev:
+            keep.append((prev, rs))
+        prev = re
+    if prev < duration:
+        keep.append((prev, duration))
+
+    if not keep:
+        # Nothing to keep — return copy of original
+        out = os.path.join(work_dir, "output_clip_0.mp4")
+        shutil.copy2(video_path, out)
+        return [out]
+
+    # Determine clip boundaries based on split points
+    # Map split_points to positions in the *keep* timeline
+    if not split_points:
+        # Single clip — render all keep segments
+        out = os.path.join(work_dir, "output_clip_0.mp4")
+        _render_keep_segments(video_path, keep, out)
+        return [out]
+
+    # Partition keep segments into clips at split boundaries
+    clips: list[list[tuple[float, float]]] = []
+    current_clip: list[tuple[float, float]] = []
+    sp_idx = 0
+
+    for seg_start, seg_end in keep:
+        while sp_idx < len(split_points) and split_points[sp_idx] <= seg_start:
+            if current_clip:
+                clips.append(current_clip)
+                current_clip = []
+            sp_idx += 1
+
+        if sp_idx < len(split_points) and seg_start < split_points[sp_idx] < seg_end:
+            # Split point falls inside this keep segment
+            boundary = split_points[sp_idx]
+            if boundary - seg_start > 0.05:
+                current_clip.append((seg_start, boundary))
+            if current_clip:
+                clips.append(current_clip)
+                current_clip = []
+            if seg_end - boundary > 0.05:
+                current_clip.append((boundary, seg_end))
+            sp_idx += 1
+        else:
+            current_clip.append((seg_start, seg_end))
+
+    if current_clip:
+        clips.append(current_clip)
+
+    # Render each clip
+    output_paths: list[str] = []
+    for i, clip_segs in enumerate(clips):
+        if not clip_segs:
+            continue
+        out = os.path.join(work_dir, f"output_clip_{i}.mp4")
+        _render_keep_segments(video_path, clip_segs, out)
+        output_paths.append(out)
+
+    return output_paths or [video_path]
+
+
+def _render_keep_segments(
+    video_path: str,
+    keep: list[tuple[float, float]],
+    output_path: str,
+) -> str:
+    """Concat *keep* intervals from *video_path* into *output_path*."""
+    if not keep:
+        shutil.copy2(video_path, output_path)
+        return output_path
+
+    if len(keep) == 1:
+        start, end = keep[0]
+        seg = ffmpeg.input(video_path, ss=start, t=end - start)
+        a_out = seg.audio.filter("highpass", f=20)
+        (
+            ffmpeg
+            .output(seg.video, a_out, output_path)
+            .overwrite_output()
+            .run(quiet=True)
+        )
+        return output_path
+
+    segments = []
+    for start, end in keep:
+        seg = ffmpeg.input(video_path, ss=start, t=end - start)
+        segments.extend([seg.video, seg.audio])
+
+    joined = ffmpeg.concat(*segments, v=1, a=1).node
+    v_out = joined[0]
+    a_out = joined[1].filter("highpass", f=20)
+
+    (
+        ffmpeg
+        .output(v_out, a_out, output_path)
+        .overwrite_output()
+        .run(quiet=True)
+    )
     return output_path
