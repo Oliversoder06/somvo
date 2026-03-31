@@ -255,11 +255,13 @@ def _render_keep_segments(
 
     if len(keep) == 1:
         start, end = keep[0]
-        seg = ffmpeg.input(video_path, ss=start, t=end - start)
-        a_out = seg.audio.filter("highpass", f=20)
+        # Use input seek for fast positioning, then trim filter for frame-accuracy
+        seg = ffmpeg.input(video_path, ss=start)
+        v_out = seg.video.filter("trim", start=start, end=end).filter("setpts", "PTS-STARTPTS")
+        a_out = seg.audio.filter("atrim", start=start, end=end).filter("asetpts", "PTS-STARTPTS").filter("highpass", f=20)
         (
             ffmpeg
-            .output(seg.video, a_out, output_path)
+            .output(v_out, a_out, output_path)
             .overwrite_output()
             .run(quiet=True)
         )
@@ -271,11 +273,13 @@ def _render_keep_segments(
     # Pass 1: extract each keep segment to its own file
     for i, (start, end) in enumerate(keep):
         seg_path = os.path.join(work_dir, f"_seg_{i}.mp4")
-        seg = ffmpeg.input(video_path, ss=start, t=end - start)
-        a_out = seg.audio.filter("highpass", f=20)
+        # Use input seek for fast positioning, then trim filter for frame-accuracy
+        seg = ffmpeg.input(video_path, ss=start)
+        v_out = seg.video.filter("trim", start=start, end=end).filter("setpts", "PTS-STARTPTS")
+        a_out = seg.audio.filter("atrim", start=start, end=end).filter("asetpts", "PTS-STARTPTS").filter("highpass", f=20)
         (
             ffmpeg
-            .output(seg.video, a_out, seg_path)
+            .output(v_out, a_out, seg_path)
             .overwrite_output()
             .run(quiet=True)
         )

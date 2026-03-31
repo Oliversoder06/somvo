@@ -44,7 +44,7 @@ export default function EditorPage() {
   // Reset store when project ID changes
   const prevIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (prevIdRef.current && prevIdRef.current !== id) {
+    if (prevIdRef.current !== id) {
       resetStore();
     }
     prevIdRef.current = id;
@@ -84,7 +84,16 @@ export default function EditorPage() {
         | "processing",
     );
     if (project.processed_url) setProcessedUrl(project.processed_url);
-  }, [project, setProjectId, setProjectName, setStatus, setProcessedUrl]);
+    if (project.processed_duration != null)
+      setProcessedDuration(project.processed_duration);
+  }, [
+    project,
+    setProjectId,
+    setProjectName,
+    setStatus,
+    setProcessedUrl,
+    setProcessedDuration,
+  ]);
 
   // Signed URL management
   useSignedUrl(project?.raw_url);
@@ -138,7 +147,12 @@ export default function EditorPage() {
   const { syncStepsToDb, pendingStepsRef } = useStepSync(id, stepsLoaded);
 
   // SSE agent stream
-  const handleAgentStream = useAgentStream(id, stepsLoaded, syncStepsToDb, pendingStepsRef);
+  const handleAgentStream = useAgentStream(
+    id,
+    stepsLoaded,
+    syncStepsToDb,
+    pendingStepsRef,
+  );
 
   const handleSubmitPrompt = useCallback(async () => {
     if (!prompt.trim()) return;

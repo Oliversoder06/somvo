@@ -37,9 +37,16 @@ export function TransportBar({
   const zoom = useEditorStore((s) => s.timelineZoom);
   const setZoom = useEditorStore((s) => s.setTimelineZoom);
 
-  const mergedCuts = useMemo(() => {
+  const isEstimate =
+    previewMode && processedDuration == null && steps.length > 0;
+
+  // Estimate preview duration from step ranges; use real value from DB when available
+  const displayDuration = useMemo(() => {
+    if (!previewMode) return duration;
+    if (processedDuration != null) return processedDuration;
+    // Merge overlapping cut ranges
     const ranges = steps
-      .filter((s) => s.status === "approved")
+      .filter((s) => s.status === "approved" || s.status === "pending")
       .map((s) => [s.startTime, s.endTime] as [number, number])
       .sort((a, b) => a[0] - b[0]);
     const merged: [number, number][] = [];
@@ -53,23 +60,9 @@ export function TransportBar({
         merged.push([s, e]);
       }
     }
-    return merged;
-  }, [steps]);
-
-  const previewDuration = useMemo(() => {
-    if (processedDuration != null) return processedDuration;
-    const totalRemoved = mergedCuts.reduce((sum, [s, e]) => sum + (e - s), 0);
+    const totalRemoved = merged.reduce((sum, [s, e]) => sum + (e - s), 0);
     return duration - totalRemoved;
-  }, [processedDuration, mergedCuts, duration]);
-
-  const previewCurrentTime = useMemo(() => {
-    let removed = 0;
-    for (const [s, e] of mergedCuts) {
-      if (currentTime <= s) break;
-      removed += Math.min(currentTime, e) - s;
-    }
-    return currentTime - removed;
-  }, [currentTime, mergedCuts]);
+  }, [previewMode, processedDuration, steps, duration]);
 
   const togglePlay = useCallback(() => {
     const el = playerRef.current;
@@ -193,10 +186,14 @@ export function TransportBar({
             letterSpacing: "0.02em",
           }}
         >
-          {formatTimecode(previewMode ? previewCurrentTime : currentTime)}
-          <span style={{ color: "var(--text-muted)" }}>
+          {formatTimecode(currentTime)}
+          <span
+            style={{ color: "var(--text-muted)" }}
+            title={isEstimate ? "Estimate — accept changes for exact time" : undefined}
+          >
             {" / "}
-            {formatTimecode(previewMode ? previewDuration : duration)}
+            {isEstimate ? "~" : ""}
+            {formatTimecode(displayDuration)}
           </span>
         </span>
       </div>

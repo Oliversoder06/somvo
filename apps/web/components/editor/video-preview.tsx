@@ -21,8 +21,10 @@ export function VideoPreview({
   // Preview mode: skip over approved cuts during playback
   useEffect(() => {
     if (!previewMode) return;
-    const approved = steps.filter((s) => s.status === "approved");
-    const inside = approved.find(
+    const active = steps.filter(
+      (s) => s.status === "approved" || s.status === "pending",
+    );
+    const inside = active.find(
       (s) => currentTime >= s.startTime && currentTime < s.endTime,
     );
     if (inside && playerRef.current) {

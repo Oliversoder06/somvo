@@ -41,6 +41,7 @@ export type Database = {
           status: "uploading" | "processing" | "ready" | "done" | "failed";
           raw_url: string | null;
           processed_url: string | null;
+          processed_duration: number | null;
           duration_seconds: number | null;
           created_at: string;
         };
@@ -51,6 +52,7 @@ export type Database = {
           status?: "uploading" | "processing" | "ready" | "done" | "failed";
           raw_url?: string | null;
           processed_url?: string | null;
+          processed_duration?: number | null;
           duration_seconds?: number | null;
           created_at?: string;
         };
@@ -61,6 +63,7 @@ export type Database = {
           status?: "uploading" | "processing" | "ready" | "done" | "failed";
           raw_url?: string | null;
           processed_url?: string | null;
+          processed_duration?: number | null;
           duration_seconds?: number | null;
           created_at?: string;
         };

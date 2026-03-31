@@ -176,10 +176,13 @@ async def execute_edits(req: ExecuteRequest):
             )
 
         # Update project status
-        supabase.table("projects").update({
+        update_fields: dict = {
             "status": "done",
             "processed_url": storage_path,
-        }).eq("id", req.project_id).execute()
+        }
+        if final_duration is not None:
+            update_fields["processed_duration"] = final_duration
+        supabase.table("projects").update(update_fields).eq("id", req.project_id).execute()
 
         return ExecuteResponse(
             success=True,

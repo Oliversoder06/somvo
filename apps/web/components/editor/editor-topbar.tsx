@@ -45,13 +45,17 @@ export function EditorTopbar() {
         alert("Could not generate download link");
         return;
       }
-      // Download via hidden anchor
+      // Download via fetch + blob to force save-as on cross-origin URLs
+      const res = await fetch(data.signedUrl);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = data.signedUrl;
+      a.href = blobUrl;
       a.download = filename || "export.mp4";
       document.body.appendChild(a);
       a.click();
       a.remove();
+      URL.revokeObjectURL(blobUrl);
     } catch {
       alert("Export failed — try again");
     } finally {
