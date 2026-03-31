@@ -8,6 +8,7 @@ export type EditStep = {
   reason: string;
   startTime: number;
   endTime: number;
+  confidence?: number;
   status: StepStatus;
 };
 
@@ -47,12 +48,33 @@ export const PIPELINE_VERSIONS: PipelineVersion[] = [
   // },
 ];
 
+const INITIAL_STATE = {
+  projectId: null as string | null,
+  projectName: "Untitled",
+  status: "ready" as "uploading" | "processing" | "ready" | "done" | "failed",
+  videoUrl: null as string | null,
+  processedUrl: null as string | null,
+  processedDuration: null as number | null,
+  duration: 0,
+  currentTime: 0,
+  isPlaying: false,
+  previewMode: false,
+  pipelineVersion: "v1",
+  timelineZoom: 1,
+  timelineHeight: 200,
+  agentPanelOpen: true,
+  agentState: "idle" as AgentState,
+  agentMessages: [] as string[],
+  steps: [] as EditStep[],
+};
+
 interface EditorStore {
   projectId: string | null;
   projectName: string;
   status: "uploading" | "processing" | "ready" | "done" | "failed";
   videoUrl: string | null;
   processedUrl: string | null;
+  processedDuration: number | null;
   duration: number;
   currentTime: number;
   isPlaying: boolean;
@@ -68,6 +90,7 @@ interface EditorStore {
   setStatus: (s: EditorStore["status"]) => void;
   setVideoUrl: (url: string) => void;
   setProcessedUrl: (url: string | null) => void;
+  setProcessedDuration: (d: number | null) => void;
   setDuration: (d: number) => void;
   setCurrentTime: (t: number) => void;
   setIsPlaying: (p: boolean) => void;
@@ -87,32 +110,19 @@ interface EditorStore {
   approveAll: () => void;
   rejectAll: () => void;
   clearSteps: () => void;
+  /** Reset ALL project-specific state (use when navigating between projects). */
+  reset: () => void;
 }
 
 export const useEditorStore = create<EditorStore>((set) => ({
-  projectId: null,
-  projectName: "Untitled",
-  status: "ready",
-  videoUrl: null,
-  processedUrl: null,
-  duration: 0,
-  currentTime: 0,
-  isPlaying: false,
-  previewMode: false,
-  pipelineVersion: "v1",
-  timelineZoom: 1,
-  timelineHeight: 200,
-  agentPanelOpen: true,
-
-  agentState: "idle",
-  agentMessages: [],
-  steps: [],
+  ...INITIAL_STATE,
 
   setProjectId: (id) => set({ projectId: id }),
   setProjectName: (name) => set({ projectName: name }),
   setStatus: (s) => set({ status: s }),
   setVideoUrl: (url) => set({ videoUrl: url }),
   setProcessedUrl: (url) => set({ processedUrl: url }),
+  setProcessedDuration: (d) => set({ processedDuration: d }),
   setDuration: (d) => set({ duration: d }),
   setCurrentTime: (t) => set({ currentTime: t }),
   setIsPlaying: (p) => set({ isPlaying: p }),
@@ -148,4 +158,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
       steps: state.steps.map((s) => ({ ...s, status: "rejected" as const })),
     })),
   clearSteps: () => set({ steps: [], agentMessages: [], agentState: "idle" }),
+  reset: () =>
+    set({
+      ...INITIAL_STATE,
+      // Preserve UI preferences across projects
+      agentPanelOpen: true,
+    }),
 }));

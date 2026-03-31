@@ -400,7 +400,8 @@ export function Timeline({
 
   const renderCutRegions = () =>
     steps.map((step) => {
-      if (duration <= 0 || step.status !== "approved") return null;
+      if (duration <= 0 || step.status !== "approved" || !previewMode)
+        return null;
       const left = (step.startTime / duration) * 100;
       const width = ((step.endTime - step.startTime) / duration) * 100;
       return (

@@ -30,6 +30,8 @@ class ExecuteRequest(BaseModel):
 class ExecuteResponse(BaseModel):
     success: bool
     processed_url: str
+    actual_duration: float | None = None
+    total_removed: float | None = None
 
 
 @router.post("/execute", response_model=ExecuteResponse)
@@ -152,6 +154,18 @@ async def execute_edits(req: ExecuteRequest):
             cap_resolution(current_path, capped_output, max_height=720)
             current_path = capped_output
 
+        # Probe final output for the real duration
+        final_duration: float | None = None
+        final_removed: float | None = None
+        try:
+            final_probe = ffmpeg_lib.probe(current_path)
+            final_duration = float(final_probe["format"]["duration"])
+            source_probe_final = ffmpeg_lib.probe(video_path)
+            source_dur_final = float(source_probe_final["format"]["duration"])
+            final_removed = source_dur_final - final_duration
+        except Exception:
+            pass
+
         # Upload processed video to Supabase Storage
         storage_path = f"{user_id}/{req.project_id}/output.mp4"
         with open(current_path, "rb") as f:
@@ -167,7 +181,12 @@ async def execute_edits(req: ExecuteRequest):
             "processed_url": storage_path,
         }).eq("id", req.project_id).execute()
 
-        return ExecuteResponse(success=True, processed_url=storage_path)
+        return ExecuteResponse(
+            success=True,
+            processed_url=storage_path,
+            actual_duration=final_duration,
+            total_removed=final_removed,
+        )
 
     except Exception as exc:
         # Mark project as failed on error

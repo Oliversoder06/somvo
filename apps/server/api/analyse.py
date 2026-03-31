@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import tempfile
@@ -13,6 +14,7 @@ from lib.supabase import get_supabase
 from pipelines import get_pipeline
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class AnalyseRequest(BaseModel):
@@ -85,14 +87,19 @@ async def analysis_stream(
 
         # Store transcript in Supabase
         if transcript:
-            supabase.table("transcripts").upsert(
-                {
-                    "project_id": project_id,
-                    "words": transcript["words"],
-                    "srt": transcript["srt"],
-                },
-                on_conflict="project_id",
-            ).execute()
+            try:
+                supabase.table("transcripts").upsert(
+                    {
+                        "project_id": project_id,
+                        "words": transcript["words"],
+                        "srt": transcript["srt"],
+                    },
+                    on_conflict="project_id",
+                ).execute()
+            except Exception as db_err:
+                logger.error("Failed to upsert transcript for project %s: %s", project_id, db_err)
+                yield f"data: {json.dumps({'type': 'error', 'message': f'Failed to save transcript: {db_err}'})}\n\n"
+                return
 
         # Store edit steps + pipeline log in Supabase
         steps_payload = [
@@ -107,22 +114,30 @@ async def analysis_stream(
             }
             for s in steps
         ]
-        supabase.table("edit_steps").upsert(
-            {
-                "project_id": project_id,
-                "steps": steps_payload,
-                "pipeline_log": pipeline_log.summary() if pipeline_log else {},
-            },
-            on_conflict="project_id",
-        ).execute()
+        try:
+            supabase.table("edit_steps").upsert(
+                {
+                    "project_id": project_id,
+                    "steps": steps_payload,
+                    "pipeline_log": pipeline_log.summary() if pipeline_log else {},
+                },
+                on_conflict="project_id",
+            ).execute()
+        except Exception as db_err:
+            logger.error("Failed to upsert edit_steps for project %s: %s", project_id, db_err)
+            yield f"data: {json.dumps({'type': 'error', 'message': f'Failed to save edit steps: {db_err}'})}\n\n"
+            return
 
         # Update project status
-        supabase.table("projects").update(
-            {
-                "status": "ready",
-                "duration_seconds": int(duration),
-            }
-        ).eq("id", project_id).execute()
+        try:
+            supabase.table("projects").update(
+                {
+                    "status": "ready",
+                    "duration_seconds": int(duration),
+                }
+            ).eq("id", project_id).execute()
+        except Exception as db_err:
+            logger.error("Failed to update project status for %s: %s", project_id, db_err)
 
         yield f"data: {json.dumps({'type': 'done', 'step_count': len(steps)})}\n\n"
 

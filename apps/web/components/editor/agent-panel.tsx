@@ -44,13 +44,16 @@ export function AgentPanel({
   prompt,
   setPrompt,
   onSubmitPrompt,
+  onDiscard,
 }: {
   onSeek?: (time: number) => void;
   prompt: string;
   setPrompt: (v: string) => void;
   onSubmitPrompt: () => void;
+  onDiscard: () => void;
 }) {
   const agentState = useEditorStore((s) => s.agentState);
+  const setAgentState = useEditorStore((s) => s.setAgentState);
   const agentMessages = useEditorStore((s) => s.agentMessages);
   const steps = useEditorStore((s) => s.steps);
   const approveAll = useEditorStore((s) => s.approveAll);
@@ -58,6 +61,8 @@ export function AgentPanel({
   const projectId = useEditorStore((s) => s.projectId);
   const setStatus = useEditorStore((s) => s.setStatus);
   const setProcessedUrl = useEditorStore((s) => s.setProcessedUrl);
+  const setProcessedDuration = useEditorStore((s) => s.setProcessedDuration);
+  const processedDuration = useEditorStore((s) => s.processedDuration);
   const duration = useEditorStore((s) => s.duration);
   const agentPanelOpen = useEditorStore((s) => s.agentPanelOpen);
   const toggleAgentPanel = useEditorStore((s) => s.toggleAgentPanel);
@@ -69,6 +74,7 @@ export function AgentPanel({
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [cardsExpanded, setCardsExpanded] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedPipeline =
@@ -112,7 +118,11 @@ export function AgentPanel({
   }, [steps]);
 
   const approvedCount = steps.filter((s) => s.status === "approved").length;
-  const finalDuration = duration - totalRemoved;
+  // After export, use real duration from backend; otherwise use estimate
+  const finalDuration = processedDuration ?? duration - totalRemoved;
+  const displayRemoved = processedDuration
+    ? duration - processedDuration
+    : totalRemoved;
 
   // Simulated progress: accelerates to ~30%, crawls to ~90%, waits for real completion
   const startProgress = useCallback(() => {
@@ -178,10 +188,13 @@ export function AgentPanel({
       if (res.ok) {
         const body = await res.json().catch(() => null);
         if (body?.processed_url) setProcessedUrl(body.processed_url);
+        if (body?.actual_duration != null)
+          setProcessedDuration(body.actual_duration);
         stopProgress(true);
         // Brief pause at 100% before transitioning
         await new Promise((r) => setTimeout(r, 500));
         setStatus("done");
+        setAgentState("idle");
       } else {
         const detail = await res.text().catch(() => "Unknown error");
         stopProgress(false);
@@ -198,7 +211,13 @@ export function AgentPanel({
   const isStreaming = agentState === "streaming";
   const hasSteps = steps.length > 0;
   const hasMessages = agentMessages.length > 0;
+  const isAccepted = agentState === "idle" && hasSteps;
   const showEmpty = agentState === "idle" && !hasMessages && !hasSteps;
+
+  // Reset deck state when a new analysis starts
+  useEffect(() => {
+    if (isStreaming) setCardsExpanded(false);
+  }, [isStreaming]);
 
   return (
     <div
@@ -602,7 +621,7 @@ export function AgentPanel({
                   }}
                 >
                   <Clock size={9} strokeWidth={1.5} />
-                  {totalRemoved.toFixed(1)}s removed
+                  {displayRemoved.toFixed(1)}s removed
                 </span>
                 <span
                   className="badge"
@@ -627,67 +646,132 @@ export function AgentPanel({
                 {formatDuration(duration)} &rarr;{" "}
                 {formatDuration(finalDuration)}
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={approveAll}
-                  className="flex items-center gap-1.5"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10,
-                    color: "var(--success)",
-                    background: "rgba(62,207,142,.08)",
-                    border: "1px solid rgba(62,207,142,.15)",
-                    borderRadius: 5,
-                    padding: "4px 8px",
-                    cursor: "pointer",
-                    transition: "all 150ms ease",
-                  }}
-                >
-                  <CheckCheck size={11} strokeWidth={1.5} />
-                  Accept all
-                </button>
-                <button
-                  onClick={rejectAll}
-                  className="flex items-center gap-1.5"
-                  style={{
-                    fontFamily: "var(--font-mono)",
-                    fontSize: 10,
-                    color: "var(--text-muted)",
-                    background: "transparent",
-                    border: "1px solid var(--bg-border)",
-                    borderRadius: 5,
-                    padding: "4px 8px",
-                    cursor: "pointer",
-                    transition: "all 150ms ease",
-                  }}
-                >
-                  <XCircle size={11} strokeWidth={1.5} />
-                  Reject all
-                </button>
-              </div>
             </div>
 
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="show"
-              className="flex flex-col"
-              style={{ gap: 4, paddingBottom: 8 }}
-            >
-              <AnimatePresence>
-                {steps.map((step) => (
-                  <motion.div key={step.id} variants={cardVariants}>
-                    <StepCard step={step} onSeek={onSeek} />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </motion.div>
+            {/* Collapsed card deck (post-accept) */}
+            {isAccepted && !cardsExpanded ? (
+              <motion.div
+                onClick={() => setCardsExpanded(true)}
+                whileHover={{ scale: 1.015 }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  position: "relative",
+                  height: 82,
+                  cursor: "pointer",
+                  marginBottom: 8,
+                }}
+              >
+                {steps.slice(0, 3).map((step, i) => {
+                  const offset = i * 6;
+                  const scale = 1 - i * 0.03;
+                  return (
+                    <motion.div
+                      key={step.id}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{
+                        y: offset,
+                        opacity: 1 - i * 0.15,
+                        scale,
+                      }}
+                      transition={{
+                        duration: 0.35,
+                        delay: i * 0.05,
+                        ease: "easeOut",
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: 3 - i,
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <StepCard step={step} />
+                    </motion.div>
+                  );
+                })}
+                {/* Hover hint overlay */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  whileHover={{ opacity: 1 }}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 8,
+                    background: "rgba(0,0,0,.45)",
+                    backdropFilter: "blur(2px)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#fff",
+                      letterSpacing: "0.03em",
+                    }}
+                  >
+                    {steps.length} cuts — click to expand
+                  </span>
+                </motion.div>
+              </motion.div>
+            ) : (
+              /* Expanded card list (review mode or expanded post-accept) */
+              <>
+                {isAccepted && cardsExpanded && (
+                  <motion.button
+                    onClick={() => setCardsExpanded(false)}
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-1.5"
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 10,
+                      color: "var(--text-muted)",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: "2px 0 6px",
+                      transition: "color 120ms ease",
+                    }}
+                    whileHover={{ color: "var(--text-primary)" }}
+                  >
+                    <ChevronDown
+                      size={11}
+                      strokeWidth={1.5}
+                      style={{ transform: "rotate(180deg)" }}
+                    />
+                    Collapse
+                  </motion.button>
+                )}
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="show"
+                  className="flex flex-col"
+                  style={{ gap: 4, paddingBottom: 8 }}
+                >
+                  <AnimatePresence>
+                    {steps.map((step) => (
+                      <motion.div key={step.id} variants={cardVariants}>
+                        <StepCard step={step} onSeek={onSeek} />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              </>
+            )}
           </>
         )}
       </div>
 
-      {/* Confirm edits button */}
-      {hasSteps && (
+      {/* Review actions — Accept / Discard */}
+      {hasSteps && agentState === "done" && (
         <div
           style={{
             padding: "8px 12px",
@@ -707,114 +791,116 @@ export function AgentPanel({
               {confirmError}
             </div>
           )}
-          <button
-            onClick={handleConfirm}
-            disabled={!hasApproved || isConfirming}
-            style={{
-              width: "100%",
-              position: "relative",
-              overflow: "hidden",
-              background: hasApproved
-                ? isConfirming
-                  ? "var(--bg-elevated)"
-                  : "linear-gradient(135deg, var(--accent-from), var(--accent-to))"
-                : "var(--bg-elevated)",
-              color: hasApproved ? "#fff" : "var(--text-muted)",
-              fontFamily: "var(--font-display)",
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: "0.02em",
-              padding: "10px 0",
-              borderRadius: 8,
-              textAlign: "center",
-              cursor: hasApproved && !isConfirming ? "pointer" : "not-allowed",
-              border: hasApproved
-                ? isConfirming
-                  ? "1px solid rgba(255,255,255,.06)"
-                  : "none"
-                : "1px solid var(--bg-border)",
-              opacity: hasApproved ? 1 : 0.5,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-              boxShadow: hasApproved
-                ? isConfirming
-                  ? `0 0 ${12 + confirmProgress * 0.2}px rgba(255,106,82,${0.15 + confirmProgress * 0.003})`
-                  : "0 0 20px rgba(255,106,82,.2)"
-                : "none",
-              transition: "all 200ms ease",
-              isolation: "isolate",
-            }}
-          >
-            {/* Animated gradient fill */}
-            {isConfirming && (
-              <motion.div
-                initial={{ width: "0%" }}
-                animate={{ width: `${confirmProgress}%` }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  background:
-                    "linear-gradient(135deg, var(--accent-from), var(--accent-to))",
-                  borderRadius: 8,
-                  zIndex: 0,
-                }}
-              />
-            )}
-            {/* 100% complete shimmer */}
-            {isConfirming && confirmProgress >= 100 && (
-              <motion.div
-                initial={{ x: "-100%", opacity: 0.4 }}
-                animate={{ x: "200%", opacity: 0 }}
-                transition={{ duration: 0.8, ease: "easeInOut" }}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  width: "40%",
-                  background:
-                    "linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent)",
-                  zIndex: 1,
-                }}
-              />
-            )}
-            {/* Button content */}
-            <span
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleConfirm}
+              disabled={!hasApproved || isConfirming}
               style={{
+                flex: 1,
                 position: "relative",
-                zIndex: 2,
+                overflow: "hidden",
+                background: hasApproved
+                  ? isConfirming
+                    ? "var(--bg-elevated)"
+                    : "linear-gradient(135deg, var(--accent-from), var(--accent-to))"
+                  : "var(--bg-elevated)",
+                color: hasApproved ? "#fff" : "var(--text-muted)",
+                fontFamily: "var(--font-display)",
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.02em",
+                padding: "10px 0",
+                borderRadius: 8,
+                textAlign: "center",
+                cursor:
+                  hasApproved && !isConfirming ? "pointer" : "not-allowed",
+                border: hasApproved
+                  ? isConfirming
+                    ? "1px solid rgba(255,255,255,.06)"
+                    : "none"
+                  : "1px solid var(--bg-border)",
+                opacity: hasApproved ? 1 : 0.5,
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: 6,
+                boxShadow: hasApproved
+                  ? isConfirming
+                    ? `0 0 ${12 + confirmProgress * 0.2}px rgba(255,106,82,${0.15 + confirmProgress * 0.003})`
+                    : "0 0 20px rgba(255,106,82,.2)"
+                  : "none",
+                transition: "all 200ms ease",
+                isolation: "isolate",
               }}
             >
-              {isConfirming ? (
-                <>
-                  <Loader2
-                    size={13}
-                    strokeWidth={1.5}
-                    className="animate-spin"
-                    style={{ opacity: confirmProgress >= 100 ? 0 : 1 }}
-                  />
-                  {confirmProgress >= 100
-                    ? "Done!"
-                    : `Processing — ${Math.round(confirmProgress)}%`}
-                </>
-              ) : confirmProgress >= 100 ? (
-                <>
-                  <CheckCircle size={13} strokeWidth={1.5} />
-                  Done!
-                </>
-              ) : (
-                "Confirm edits"
+              {/* Animated gradient fill */}
+              {isConfirming && (
+                <motion.div
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${confirmProgress}%` }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    background:
+                      "linear-gradient(135deg, var(--accent-from), var(--accent-to))",
+                    borderRadius: 8,
+                    zIndex: 0,
+                  }}
+                />
               )}
-            </span>
-          </button>
+              <span
+                style={{
+                  position: "relative",
+                  zIndex: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                {isConfirming ? (
+                  <>
+                    <Loader2
+                      size={13}
+                      strokeWidth={1.5}
+                      className="animate-spin"
+                    />
+                    {`Processing — ${Math.round(confirmProgress)}%`}
+                  </>
+                ) : (
+                  <>
+                    <CheckCheck size={13} strokeWidth={1.5} />
+                    Accept
+                  </>
+                )}
+              </span>
+            </button>
+            <button
+              onClick={onDiscard}
+              disabled={isConfirming}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: "1px solid var(--bg-border)",
+                background: "transparent",
+                color: "var(--text-muted)",
+                fontFamily: "var(--font-display)",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: isConfirming ? "not-allowed" : "pointer",
+                opacity: isConfirming ? 0.4 : 1,
+                transition: "all 150ms ease",
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                flexShrink: 0,
+              }}
+            >
+              <XCircle size={13} strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -864,7 +950,11 @@ export function AgentPanel({
               }
             }}
             disabled={isStreaming}
-            placeholder="What do you want to do?"
+            placeholder={
+              agentState === "done" && steps.length > 0
+                ? "Want changes? Describe them..."
+                : "What do you want to do?"
+            }
             className="editor-input"
             style={{
               width: "100%",

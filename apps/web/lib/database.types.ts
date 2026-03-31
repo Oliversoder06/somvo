@@ -14,18 +14,21 @@ export type Database = {
           id: string;
           email: string;
           plan: "free" | "creator" | "pro";
+          pipeline_version: string;
           created_at: string;
         };
         Insert: {
           id: string;
           email: string;
           plan?: "free" | "creator" | "pro";
+          pipeline_version?: string;
           created_at?: string;
         };
         Update: {
           id?: string;
           email?: string;
           plan?: "free" | "creator" | "pro";
+          pipeline_version?: string;
           created_at?: string;
         };
         Relationships: [];
@@ -109,6 +112,7 @@ export type Database = {
           project_id: string;
           steps: Json;
           approved_steps: Json | null;
+          pipeline_log: Json;
           created_at: string;
         };
         Insert: {
@@ -116,6 +120,7 @@ export type Database = {
           project_id: string;
           steps: Json;
           approved_steps?: Json | null;
+          pipeline_log?: Json;
           created_at?: string;
         };
         Update: {
@@ -123,13 +128,14 @@ export type Database = {
           project_id?: string;
           steps?: Json;
           approved_steps?: Json | null;
+          pipeline_log?: Json;
           created_at?: string;
         };
         Relationships: [
           {
             foreignKeyName: "edit_steps_project_id_fkey";
             columns: ["project_id"];
-            isOneToOne: false;
+            isOneToOne: true;
             referencedRelation: "projects";
             referencedColumns: ["id"];
           },

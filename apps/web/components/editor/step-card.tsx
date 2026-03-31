@@ -47,16 +47,16 @@ export function StepCard({
         background: "var(--bg-elevated)",
         borderRadius: 7,
         padding: "9px 10px",
-        borderLeft: `2px solid ${borderColor}`,
         cursor: "pointer",
         display: "flex",
         alignItems: "flex-start",
         gap: 9,
         opacity: isRejected ? 0.35 : 1,
         transition: "all 150ms ease",
-        border: `1px solid ${isApproved ? "rgba(62,207,142,.15)" : isRejected ? "rgba(229,72,77,.1)" : "var(--bg-border)"}`,
-        borderLeftWidth: 2,
-        borderLeftColor: borderColor,
+        borderTop: `1px solid ${isApproved ? "rgba(62,207,142,.15)" : isRejected ? "rgba(229,72,77,.1)" : "var(--bg-border)"}`,
+        borderRight: `1px solid ${isApproved ? "rgba(62,207,142,.15)" : isRejected ? "rgba(229,72,77,.1)" : "var(--bg-border)"}`,
+        borderBottom: `1px solid ${isApproved ? "rgba(62,207,142,.15)" : isRejected ? "rgba(229,72,77,.1)" : "var(--bg-border)"}`,
+        borderLeft: `2px solid ${borderColor}`,
       }}
     >
       {/* Checkbox */}

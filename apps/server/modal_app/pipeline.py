@@ -56,16 +56,17 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
             silences, transcript, duration, audio_silences=audio_silences,
         )
 
-        # 5. Store transcript in Supabase
-        supabase.table("transcripts").insert(
+        # 5. Store transcript in Supabase (upsert for idempotency)
+        supabase.table("transcripts").upsert(
             {
                 "project_id": project_id,
                 "words": transcript["words"],
                 "srt": transcript["srt"],
-            }
+            },
+            on_conflict="project_id",
         ).execute()
 
-        # 6. Store edit steps + pipeline log in Supabase
+        # 6. Store edit steps + pipeline log in Supabase (upsert for idempotency)
         steps_payload = [
             {
                 "id": s.id,
@@ -78,12 +79,13 @@ async def run_pipeline(project_id: str, raw_storage_path: str) -> dict:
             }
             for s in steps
         ]
-        supabase.table("edit_steps").insert(
+        supabase.table("edit_steps").upsert(
             {
                 "project_id": project_id,
                 "steps": steps_payload,
                 "pipeline_log": pipeline_log.summary(),
-            }
+            },
+            on_conflict="project_id",
         ).execute()
 
         # 7. Update project status to 'ready'
