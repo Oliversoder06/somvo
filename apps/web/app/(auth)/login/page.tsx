@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { handleOAuth } from "@/lib/utils/auth";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,16 +32,6 @@ export default function LoginPage() {
 
     router.push("/");
     router.refresh();
-  }
-
-  async function handleOAuth(provider: "google" | "github") {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
   }
 
   return (

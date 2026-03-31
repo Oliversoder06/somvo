@@ -18,13 +18,8 @@ import {
   Lock,
 } from "lucide-react";
 import { useEditorStore, PIPELINE_VERSIONS } from "@/lib/store/editor";
+import { formatDuration } from "@/lib/utils/format-time";
 import { StepCard } from "./step-card";
-
-function formatDuration(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 const containerVariants = {
   show: { transition: { staggerChildren: 0.04 } },

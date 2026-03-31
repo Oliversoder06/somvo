@@ -1,5 +1,5 @@
 import { Providers } from "@/components/providers";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/utils/get-user";
 import { EditorShell } from "@/components/editor/editor-shell";
 
 export default async function EditorRouteLayout({
@@ -7,26 +7,11 @@ export default async function EditorRouteLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let plan: string = "free";
-  if (user) {
-    const { data } = await supabase
-      .from("users")
-      .select("plan")
-      .eq("id", user.id)
-      .single();
-    if (data) plan = (data as { plan: string }).plan;
-  }
+  await getAuthenticatedUser();
 
   return (
     <Providers>
-      <EditorShell email={user?.email ?? null} plan={plan}>
-        {children}
-      </EditorShell>
+      <EditorShell>{children}</EditorShell>
     </Providers>
   );
 }

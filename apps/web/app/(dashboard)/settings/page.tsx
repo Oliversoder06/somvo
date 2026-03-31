@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { User, Mail, CreditCard, Shield, ExternalLink } from "lucide-react";
+import { User, Mail, CreditCard, Shield } from "lucide-react";
 import { BillingPortalButton } from "./billing-portal-button";
 
 const PLAN_LABELS: Record<string, string> = {

@@ -31,21 +31,6 @@ export const PIPELINE_VERSIONS: PipelineVersion[] = [
     minPlan: "free",
     available: true,
   },
-  // {
-  //   id: "v2",
-  //   name: "Somvo v2",
-  //   description:
-  //     "GPT-4o filler detection, caption generation & prompt understanding",
-  //   minPlan: "creator",
-  //   available: false,
-  // },
-  // {
-  //   id: "v3",
-  //   name: "Somvo v3",
-  //   description: "Style matching, brand kits & multi-clip editing",
-  //   minPlan: "pro",
-  //   available: false,
-  // },
 ];
 
 const INITIAL_STATE = {

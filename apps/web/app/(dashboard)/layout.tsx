@@ -1,27 +1,13 @@
 import { TopbarNav } from "@/components/topbar-nav";
 import { Providers } from "@/components/providers";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/utils/get-user";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Fetch user profile for plan badge
-  let plan: string = "free";
-  if (user) {
-    const { data } = await supabase
-      .from("users")
-      .select("plan")
-      .eq("id", user.id)
-      .single();
-    if (data) plan = (data as { plan: string }).plan;
-  }
+  const { user, plan } = await getAuthenticatedUser();
 
   return (
     <Providers>

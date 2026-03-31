@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { handleOAuth } from "@/lib/utils/auth";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -33,16 +34,6 @@ export default function SignupPage() {
 
     setConfirmSent(true);
     setLoading(false);
-  }
-
-  async function handleOAuth(provider: "google" | "github") {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
   }
 
   if (confirmSent) {

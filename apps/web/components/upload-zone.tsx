@@ -3,22 +3,12 @@
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, Loader2, AlertCircle } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { extractThumbnail } from "@/lib/ffmpeg/thumbnail";
-
-const MAX_FILE_SIZE = 500 * 1024 * 1024;
-const ACCEPTED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
+import { uploadVideo, ACCEPTED_TYPES, MAX_FILE_SIZE } from "@/lib/utils/upload";
 
 type UploadState =
   | { phase: "idle" }
   | { phase: "uploading"; filename: string; progress: number }
   | { phase: "error"; message: string };
-
-function extFromMime(mime: string) {
-  if (mime === "video/quicktime") return "mov";
-  if (mime === "video/webm") return "webm";
-  return "mp4";
-}
 
 export function UploadZone() {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -43,92 +33,18 @@ export function UploadZone() {
         return;
       }
 
-      const supabase = createClient();
-      const {
-        data: { user },
-        error: authErr,
-      } = await supabase.auth.getUser();
-      if (authErr || !user) {
-        setState({
-          phase: "error",
-          message: "You must be signed in to upload.",
-        });
-        return;
-      }
-
-      const { data: project, error: insertErr } = await supabase
-        .from("projects")
-        .insert({
-          user_id: user.id,
-          filename: file.name,
-          status: "uploading" as const,
-        })
-        .select("id")
-        .single();
-
-      if (insertErr || !project) {
-        setState({
-          phase: "error",
-          message: insertErr?.message ?? "Failed to create project.",
-        });
-        return;
-      }
-
-      const ext = extFromMime(file.type);
-      const storagePath = `${user.id}/${project.id}/original.${ext}`;
-
       setState({ phase: "uploading", filename: file.name, progress: 0 });
 
-      const { error: uploadErr } = await supabase.storage
-        .from("raw")
-        .upload(storagePath, file, {
-          cacheControl: "3600",
-          upsert: false,
-          contentType: file.type,
-        });
+      const result = await uploadVideo(file, (progress) => {
+        setState({ phase: "uploading", filename: file.name, progress });
+      });
 
-      if (uploadErr) {
-        await supabase.from("projects").delete().eq("id", project.id);
-        setState({ phase: "error", message: uploadErr.message });
+      if ("error" in result) {
+        setState({ phase: "error", message: result.error });
         return;
       }
 
-      setState({ phase: "uploading", filename: file.name, progress: 100 });
-
-      const { error: updateErr } = await supabase
-        .from("projects")
-        .update({ raw_url: storagePath, status: "ready" as const })
-        .eq("id", project.id);
-
-      if (updateErr) {
-        setState({ phase: "error", message: updateErr.message });
-        return;
-      }
-
-      try {
-        const { thumbnailUrl, durationSeconds } = await extractThumbnail(file);
-        if (thumbnailUrl) {
-          const thumbResp = await fetch(thumbnailUrl);
-          const thumbBlob = await thumbResp.blob();
-          await supabase.storage
-            .from("raw")
-            .upload(`${user.id}/${project.id}/thumbnail.jpg`, thumbBlob, {
-              contentType: "image/jpeg",
-              upsert: true,
-            });
-          URL.revokeObjectURL(thumbnailUrl);
-        }
-        if (durationSeconds > 0) {
-          await supabase
-            .from("projects")
-            .update({ duration_seconds: Math.round(durationSeconds) })
-            .eq("id", project.id);
-        }
-      } catch {
-        // Thumbnail extraction is non-critical
-      }
-
-      router.push(`/projects/${project.id}`);
+      router.push(`/projects/${result.projectId}`);
     },
     [router],
   );
@@ -311,7 +227,8 @@ export function UploadZone() {
         cursor: "pointer",
         position: "relative",
         overflow: "hidden",
-        transition: "border-color var(--transition-base), background var(--transition-base)",
+        transition:
+          "border-color var(--transition-base), background var(--transition-base)",
       }}
       onMouseEnter={(e) => {
         if (!isDragOver) {
@@ -334,7 +251,11 @@ export function UploadZone() {
         className="hidden"
         onChange={handleChange}
       />
-      <Upload size={20} strokeWidth={1.5} style={{ color: "var(--text-muted)" }} />
+      <Upload
+        size={20}
+        strokeWidth={1.5}
+        style={{ color: "var(--text-muted)" }}
+      />
       <span
         style={{
           fontFamily: "var(--font-display)",

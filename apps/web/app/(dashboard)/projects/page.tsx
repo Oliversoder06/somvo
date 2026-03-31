@@ -4,16 +4,10 @@ import { ProjectsPageClient } from "./projects-client";
 export default async function ProjectsPage() {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { data: projects } = await supabase
     .from("projects")
     .select("id, filename, status, created_at, user_id, raw_url")
     .order("created_at", { ascending: false });
 
-  return (
-    <ProjectsPageClient projects={projects ?? []} userId={user?.id ?? null} />
-  );
+  return <ProjectsPageClient projects={projects ?? []} />;
 }

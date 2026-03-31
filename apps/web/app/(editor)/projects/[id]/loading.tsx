@@ -1,18 +1,9 @@
-import { Loader2 } from "lucide-react";
+import { LoadingSpinner } from "@/components/loading-spinner";
 
 export default function EditorLoading() {
   return (
-    <div className="flex items-center justify-center h-full bg-base">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2
-          size={24}
-          strokeWidth={1.5}
-          className="text-fg-muted animate-spin"
-        />
-        <span className="font-mono text-[12px] text-fg-muted">
-          Loading editor…
-        </span>
-      </div>
+    <div className="h-full" style={{ background: "var(--bg-base)" }}>
+      <LoadingSpinner message="Loading editor\u2026" />
     </div>
   );
 }

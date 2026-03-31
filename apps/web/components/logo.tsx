@@ -1,5 +1,3 @@
-"use client";
-
 export function Logo({ height = 20 }: { height?: number }) {
   const aspectRatio = 1304 / 265;
   const width = height * aspectRatio;

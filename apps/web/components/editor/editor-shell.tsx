@@ -2,13 +2,7 @@
 
 import { EditorTopbar } from "./editor-topbar";
 
-export function EditorShell({
-  children,
-}: {
-  email?: string | null;
-  plan?: string;
-  children: React.ReactNode;
-}) {
+export function EditorShell({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="flex flex-col overflow-hidden"

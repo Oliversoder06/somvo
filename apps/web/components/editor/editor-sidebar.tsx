@@ -1,15 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  MousePointer2,
-  Scissors,
-  Type,
-  Music,
-  Volume2,
-  Wand2,
-  Settings,
-} from "lucide-react";
+import { MousePointer2, Scissors, Settings } from "lucide-react";
 
 const tools = [
   {
@@ -26,15 +18,6 @@ const tools = [
     shortcut: "C",
     enabled: true,
   },
-  // { id: "text", icon: Type, label: "Captions — Coming soon", enabled: false },
-  // { id: "music", icon: Music, label: "Music — Coming soon", enabled: false },
-  // { id: "audio", icon: Volume2, label: "Audio — Coming soon", enabled: false },
-  // {
-  //   id: "effects",
-  //   icon: Wand2,
-  //   label: "Effects — Coming soon",
-  //   enabled: false,
-  // },
 ] as const;
 
 export function EditorSidebar() {
