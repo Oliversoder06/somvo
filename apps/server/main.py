@@ -1,8 +1,15 @@
+import logging
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configure app-level logging so our loggers actually print
+logging.basicConfig(
+    level=logging.DEBUG if os.environ.get("DEBUG") else logging.INFO,
+    format="%(levelname)s:%(name)s: %(message)s",
+)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

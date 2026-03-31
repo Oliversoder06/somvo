@@ -1,5 +1,8 @@
 import { useCallback } from "react";
 import { useEditorStore, type EditStep } from "@/lib/store/editor";
+import { useCaptionStore } from "@/lib/store/captions";
+import { createClient } from "@/lib/supabase/client";
+import type { TranscriptWord } from "@/lib/captions/types";
 
 export function useAgentStream(
   projectId: string | undefined,
@@ -13,6 +16,7 @@ export function useAgentStream(
   const clearSteps = useEditorStore((s) => s.clearSteps);
   const setPreviewMode = useEditorStore((s) => s.setPreviewMode);
   const pipelineVersion = useEditorStore((s) => s.pipelineVersion);
+  const setCaptionWords = useCaptionStore((s) => s.setWords);
 
   const handleSubmitPrompt = useCallback(
     async (prompt: string) => {
@@ -78,8 +82,28 @@ export function useAgentStream(
           try {
             const event = JSON.parse(line.slice(6));
             if (event.type === "status") addAgentMessage(event.message);
+            if (event.type === "info") {
+              addAgentMessage(event.message);
+              setAgentState("idle");
+            }
             if (event.type === "cut")
               addStep({ ...event.step, status: "approved" as const });
+            if (event.type === "caption")
+              addStep({ ...event.step, status: "approved" as const });
+            if (event.type === "captions_ready") {
+              // Reload transcript words into caption store from DB
+              const supabase = createClient();
+              supabase
+                .from("transcripts")
+                .select("words")
+                .eq("project_id", projectId!)
+                .maybeSingle()
+                .then(({ data }) => {
+                  if (data?.words) {
+                    setCaptionWords(data.words as unknown as TranscriptWord[]);
+                  }
+                });
+            }
             if (event.type === "done") {
               setAgentState("done");
               stepsLoadedRef.current = true;
@@ -101,6 +125,7 @@ export function useAgentStream(
       clearSteps,
       addAgentMessage,
       addStep,
+      setCaptionWords,
       syncStepsToDb,
       setPreviewMode,
       stepsLoadedRef,

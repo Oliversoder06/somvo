@@ -44,18 +44,95 @@ def cut_silence(video_path: str, silence_segments: list[dict], output_path: str)
     return output_path
 
 
-def burn_captions(video_path: str, srt_path: str, output_path: str) -> str:
-    """Burn SRT captions into a video using the subtitles filter."""
-    # Escape colons and backslashes in path for FFmpeg subtitles filter
+def burn_captions(
+    video_path: str,
+    srt_path: str,
+    output_path: str,
+    style: dict | None = None,
+) -> str:
+    """Burn SRT captions into a video using the subtitles filter.
+
+    Parameters
+    ----------
+    style : dict, optional
+        Caption style dict with keys matching the ``caption_styles`` DB table.
+        When provided, font, size, colour, position and background are applied
+        via the ``force_style`` ASS override in the FFmpeg subtitles filter.
+    """
     escaped_path = srt_path.replace("\\", "\\\\").replace(":", "\\:")
+
+    # Build force_style string from caption style settings
+    force_parts: list[str] = []
+    if style:
+        font = style.get("font_family", "Inter")
+        size = style.get("font_size", 32)
+        weight = style.get("font_weight", 700)
+        color = _hex_to_ass_color(style.get("color", "#FFFFFF"))
+        highlight = _hex_to_ass_color(style.get("highlight_color", "#FF6A52"))
+        bg = style.get("background", "box")
+        position = style.get("position", "bottom")
+
+        bold = 1 if weight >= 700 else 0
+        force_parts.append(f"FontName={font}")
+        force_parts.append(f"FontSize={size}")
+        force_parts.append(f"Bold={bold}")
+        force_parts.append(f"PrimaryColour={color}")
+
+        # Alignment: SSA numbering — 2=bottom-center, 8=top-center, 5=mid-center
+        alignment_map = {"bottom": 2, "top": 8, "center": 5}
+        force_parts.append(f"Alignment={alignment_map.get(position, 2)}")
+
+        if bg == "box":
+            bg_color = style.get("background_color", "rgba(0,0,0,0.6)")
+            ass_bg = _rgba_to_ass_color(bg_color)
+            force_parts.append("BorderStyle=4")
+            force_parts.append(f"BackColour={ass_bg}")
+            force_parts.append("Shadow=0")
+        elif bg == "blur":
+            force_parts.append("BorderStyle=4")
+            force_parts.append("BackColour=&H80000000")
+            force_parts.append("Shadow=0")
+        else:
+            # No background — use outline for readability
+            force_parts.append("BorderStyle=1")
+            force_parts.append("Outline=2")
+            force_parts.append("Shadow=1")
+
+    force_style = ",".join(force_parts) if force_parts else ""
+    if force_style:
+        vf = f"subtitles={escaped_path}:force_style='{force_style}'"
+    else:
+        vf = f"subtitles={escaped_path}"
+
     (
         ffmpeg
         .input(video_path)
-        .output(output_path, vf=f"subtitles={escaped_path}")
+        .output(output_path, vf=vf)
         .overwrite_output()
         .run(quiet=True)
     )
     return output_path
+
+
+def _hex_to_ass_color(hex_color: str) -> str:
+    """Convert #RRGGBB to ASS colour format &H00BBGGRR."""
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) == 6:
+        r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
+        return f"&H00{b}{g}{r}"
+    return "&H00FFFFFF"
+
+
+def _rgba_to_ass_color(rgba: str) -> str:
+    """Convert rgba(r,g,b,a) or #RRGGBB to ASS colour format &HAA BBGGRR."""
+    import re
+    m = re.match(r"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)", rgba)
+    if m:
+        r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        a = float(m.group(4)) if m.group(4) else 1.0
+        alpha = 255 - int(a * 255)
+        return f"&H{alpha:02X}{b:02X}{g:02X}{r:02X}"
+    return _hex_to_ass_color(rgba)
 
 
 def apply_watermark(video_path: str, watermark_path: str, output_path: str) -> str:

@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { Play, Loader2 } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
+import { CaptionOverlay } from "./caption-overlay";
+import { CaptionStylePanel } from "./caption-style-panel";
 
 export function VideoPreview({
   playerRef,
@@ -105,6 +107,10 @@ export function VideoPreview({
           }}
         />
       )}
+
+      {/* Caption overlay + style panel */}
+      {videoUrl && <CaptionOverlay />}
+      {videoUrl && <CaptionStylePanel />}
 
       {isProcessing && (
         <div

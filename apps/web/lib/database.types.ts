@@ -109,6 +109,65 @@ export type Database = {
           },
         ];
       };
+      caption_styles: {
+        Row: {
+          id: string;
+          project_id: string;
+          preset: string;
+          font_family: string;
+          font_size: number;
+          font_weight: number;
+          color: string;
+          highlight_color: string;
+          background: string;
+          background_color: string;
+          position: string;
+          animation: string;
+          max_words: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          preset?: string;
+          font_family?: string;
+          font_size?: number;
+          font_weight?: number;
+          color?: string;
+          highlight_color?: string;
+          background?: string;
+          background_color?: string;
+          position?: string;
+          animation?: string;
+          max_words?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          preset?: string;
+          font_family?: string;
+          font_size?: number;
+          font_weight?: number;
+          color?: string;
+          highlight_color?: string;
+          background?: string;
+          background_color?: string;
+          position?: string;
+          animation?: string;
+          max_words?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "caption_styles_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: true;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       edit_steps: {
         Row: {
           id: string;

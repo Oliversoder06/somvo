@@ -120,17 +120,40 @@ async def execute_edits(req: ExecuteRequest):
         # Burn captions if any caption steps approved
         caption_steps = [s for s in req.approved_steps if s.type == "caption"]
         if caption_steps:
-            # Fetch SRT from transcripts table
-            transcript_result = supabase.table("transcripts").select("srt").eq(
+            # Fetch transcript words for re-chunking
+            transcript_result = supabase.table("transcripts").select("words, srt").eq(
                 "project_id", req.project_id
             ).single().execute()
-            srt_content = transcript_result.data.get("srt", "") if transcript_result.data else ""
+
+            # Fetch caption style if saved
+            caption_style: dict | None = None
+            try:
+                style_result = supabase.table("caption_styles").select("*").eq(
+                    "project_id", req.project_id
+                ).maybeSingle().execute()
+                if style_result.data:
+                    caption_style = style_result.data
+            except Exception:
+                pass  # Fall back to default style
+
+            # Re-chunk from word-level timestamps using the user's maxWords setting
+            from lib.caption_chunks import chunk_transcript, chunks_to_srt
+
+            words = transcript_result.data.get("words", []) if transcript_result.data else []
+            max_words = caption_style.get("max_words", 6) if caption_style else 6
+
+            if words:
+                chunks = chunk_transcript(words, max_words=max_words)
+                srt_content = chunks_to_srt(chunks)
+            else:
+                srt_content = transcript_result.data.get("srt", "") if transcript_result.data else ""
+
             if srt_content:
                 srt_path = os.path.join(work_dir, "captions.srt")
                 with open(srt_path, "w") as f:
                     f.write(srt_content)
                 caption_output = os.path.join(work_dir, "captioned.mp4")
-                burn_captions(current_path, srt_path, caption_output)
+                burn_captions(current_path, srt_path, caption_output, style=caption_style)
                 current_path = caption_output
 
         # Check user plan for free tier restrictions

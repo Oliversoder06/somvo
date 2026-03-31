@@ -11,6 +11,7 @@ import { useEditorStore, type EditStep } from "@/lib/store/editor";
 import { useSignedUrl } from "@/lib/hooks/use-signed-url";
 import { useStepSync } from "@/lib/hooks/use-step-sync";
 import { useAgentStream } from "@/lib/hooks/use-agent-stream";
+import { useTranscript } from "@/lib/hooks/use-transcript";
 import { LoadingSpinner } from "@/components/loading-spinner";
 import { VideoPreview } from "@/components/editor/video-preview";
 import { AgentPanel } from "@/components/editor/agent-panel";
@@ -97,6 +98,9 @@ export default function EditorPage() {
 
   // Signed URL management
   useSignedUrl(project?.raw_url);
+
+  // Load transcript + caption style from DB
+  useTranscript(id);
 
   // Fetch existing edit steps
   const stepsLoaded = useRef(false);

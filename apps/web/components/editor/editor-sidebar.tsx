@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { MousePointer2, Scissors, Settings } from "lucide-react";
+import { MousePointer2, Scissors, Settings, Subtitles } from "lucide-react";
+import { useCaptionStore } from "@/lib/store/captions";
 
 const tools = [
   {
@@ -22,6 +23,9 @@ const tools = [
 
 export function EditorSidebar() {
   const [active, setActive] = useState<string>("select");
+  const captionPanelOpen = useCaptionStore((s) => s.panelOpen);
+  const toggleCaptionPanel = useCaptionStore((s) => s.togglePanel);
+  const hasCaptions = useCaptionStore((s) => s.words.length > 0);
 
   return (
     <div
@@ -89,6 +93,34 @@ export function EditorSidebar() {
           );
         })}
       </div>
+
+      {/* Caption style toggle */}
+      <button
+        onClick={toggleCaptionPanel}
+        title="Caption styles"
+        className="sidebar-tool-btn"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 8,
+          border: "none",
+          background: captionPanelOpen ? "rgba(255,106,82,.12)" : "transparent",
+          color: captionPanelOpen
+            ? "var(--accent)"
+            : hasCaptions
+              ? "var(--text-secondary)"
+              : "var(--text-muted)",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 120ms ease",
+          opacity: hasCaptions ? 1 : 0.4,
+          marginTop: 4,
+        }}
+      >
+        <Subtitles size={16} strokeWidth={1.5} />
+      </button>
 
       <div className="flex-1" />
 

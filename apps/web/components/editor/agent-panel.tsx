@@ -94,8 +94,9 @@ export function AgentPanel({
 
   const totalRemoved = useMemo(() => {
     // Merge overlapping step ranges before summing, matching backend logic
+    // Exclude caption steps — they don't remove any footage
     const ranges = steps
-      .filter((s) => s.status === "approved")
+      .filter((s) => s.status === "approved" && s.type !== "caption")
       .map((s) => [s.startTime, s.endTime] as [number, number])
       .sort((a, b) => a[0] - b[0]);
     const merged: [number, number][] = [];
