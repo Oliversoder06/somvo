@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import {
   SkipBack,
   SkipForward,
@@ -28,12 +28,48 @@ export function TransportBar({
   const isPlaying = useEditorStore((s) => s.isPlaying);
   const currentTime = useEditorStore((s) => s.currentTime);
   const duration = useEditorStore((s) => s.duration);
+  const processedDuration = useEditorStore((s) => s.processedDuration);
   const setCurrentTime = useEditorStore((s) => s.setCurrentTime);
   const setIsPlaying = useEditorStore((s) => s.setIsPlaying);
   const previewMode = useEditorStore((s) => s.previewMode);
   const setPreviewMode = useEditorStore((s) => s.setPreviewMode);
+  const steps = useEditorStore((s) => s.steps);
   const zoom = useEditorStore((s) => s.timelineZoom);
   const setZoom = useEditorStore((s) => s.setTimelineZoom);
+
+  const mergedCuts = useMemo(() => {
+    const ranges = steps
+      .filter((s) => s.status === "approved")
+      .map((s) => [s.startTime, s.endTime] as [number, number])
+      .sort((a, b) => a[0] - b[0]);
+    const merged: [number, number][] = [];
+    for (const [s, e] of ranges) {
+      if (merged.length && s <= merged[merged.length - 1][1]) {
+        merged[merged.length - 1][1] = Math.max(
+          merged[merged.length - 1][1],
+          e,
+        );
+      } else {
+        merged.push([s, e]);
+      }
+    }
+    return merged;
+  }, [steps]);
+
+  const previewDuration = useMemo(() => {
+    if (processedDuration != null) return processedDuration;
+    const totalRemoved = mergedCuts.reduce((sum, [s, e]) => sum + (e - s), 0);
+    return duration - totalRemoved;
+  }, [processedDuration, mergedCuts, duration]);
+
+  const previewCurrentTime = useMemo(() => {
+    let removed = 0;
+    for (const [s, e] of mergedCuts) {
+      if (currentTime <= s) break;
+      removed += Math.min(currentTime, e) - s;
+    }
+    return currentTime - removed;
+  }, [currentTime, mergedCuts]);
 
   const togglePlay = useCallback(() => {
     const el = playerRef.current;
@@ -157,7 +193,11 @@ export function TransportBar({
             letterSpacing: "0.02em",
           }}
         >
-          {formatTimecode(currentTime)}
+          {formatTimecode(previewMode ? previewCurrentTime : currentTime)}
+          <span style={{ color: "var(--text-muted)" }}>
+            {" / "}
+            {formatTimecode(previewMode ? previewDuration : duration)}
+          </span>
         </span>
       </div>
 
