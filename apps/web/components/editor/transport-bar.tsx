@@ -37,9 +37,6 @@ export function TransportBar({
   const zoom = useEditorStore((s) => s.timelineZoom);
   const setZoom = useEditorStore((s) => s.setTimelineZoom);
 
-  const isEstimate =
-    previewMode && processedDuration == null && steps.length > 0;
-
   // Estimate preview duration from step ranges; use real value from DB when available
   const displayDuration = useMemo(() => {
     if (!previewMode) return duration;
@@ -187,12 +184,8 @@ export function TransportBar({
           }}
         >
           {formatTimecode(currentTime)}
-          <span
-            style={{ color: "var(--text-muted)" }}
-            title={isEstimate ? "Estimate — accept changes for exact time" : undefined}
-          >
+          <span style={{ color: "var(--text-muted)" }}>
             {" / "}
-            {isEstimate ? "~" : ""}
             {formatTimecode(displayDuration)}
           </span>
         </span>
