@@ -24,7 +24,9 @@ export function VideoPreview({
   useEffect(() => {
     if (!previewMode) return;
     const active = steps.filter(
-      (s) => s.status === "approved" || s.status === "pending",
+      (s) =>
+        (s.status === "approved" || s.status === "pending") &&
+        s.type !== "caption",
     );
     const inside = active.find(
       (s) => currentTime >= s.startTime && currentTime < s.endTime,
@@ -108,8 +110,8 @@ export function VideoPreview({
         />
       )}
 
-      {/* Caption overlay + style panel */}
-      {videoUrl && <CaptionOverlay />}
+      {/* Caption overlay (preview mode only) + style panel */}
+      {videoUrl && previewMode && <CaptionOverlay />}
       {videoUrl && <CaptionStylePanel />}
 
       {isProcessing && (

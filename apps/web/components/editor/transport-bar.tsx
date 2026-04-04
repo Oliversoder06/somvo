@@ -41,9 +41,13 @@ export function TransportBar({
   const displayDuration = useMemo(() => {
     if (!previewMode) return duration;
     if (processedDuration != null) return processedDuration;
-    // Merge overlapping cut ranges
+    // Merge overlapping cut ranges (exclude caption steps — they're not cuts)
     const ranges = steps
-      .filter((s) => s.status === "approved" || s.status === "pending")
+      .filter(
+        (s) =>
+          (s.status === "approved" || s.status === "pending") &&
+          s.type !== "caption",
+      )
       .map((s) => [s.startTime, s.endTime] as [number, number])
       .sort((a, b) => a[0] - b[0]);
     const merged: [number, number][] = [];

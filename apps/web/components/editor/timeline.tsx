@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { useEditorStore } from "@/lib/store/editor";
+import { useCaptionStore } from "@/lib/store/captions";
 import { useWaveform } from "@/lib/hooks/use-waveform";
 import { useThumbnailPool } from "@/lib/hooks/use-thumbnail-pool";
 import { useVisibleTiles, THUMB_TILE_W } from "@/lib/hooks/use-visible-tiles";
@@ -48,6 +49,10 @@ export function Timeline({
   const timelineHeight = useEditorStore((s) => s.timelineHeight);
   const setTimelineHeight = useEditorStore((s) => s.setTimelineHeight);
   const previewMode = useEditorStore((s) => s.previewMode);
+
+  const captionChunks = useCaptionStore((s) => s.chunks);
+  const captionsEnabled = useCaptionStore((s) => s.enabled);
+  const hasCaptions = captionChunks.length > 0;
 
   const waveformRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -211,7 +216,12 @@ export function Timeline({
 
   const renderCutRegions = () =>
     steps.map((step) => {
-      if (duration <= 0 || step.status !== "approved" || !previewMode)
+      if (
+        duration <= 0 ||
+        step.status !== "approved" ||
+        !previewMode ||
+        step.type === "caption"
+      )
         return null;
       const left = (step.startTime / duration) * 100;
       const width = ((step.endTime - step.startTime) / duration) * 100;
@@ -432,6 +442,30 @@ export function Timeline({
               Audio
             </span>
           </div>
+          {hasCaptions && (
+            <div
+              className="flex items-center justify-end"
+              style={{
+                height: 32,
+                paddingRight: 10,
+                borderRight: "1px solid var(--bg-border)",
+                borderTop: "1px solid var(--bg-border)",
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  color: captionsEnabled
+                    ? "var(--accent)"
+                    : "var(--text-muted)",
+                  fontWeight: 500,
+                }}
+              >
+                Subs
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Scrollable tracks content */}
@@ -530,6 +564,76 @@ export function Timeline({
                 </div>
               </div>
             </div>
+
+            {/* Captions / Subtitle track */}
+            {hasCaptions && (
+              <div
+                style={{
+                  height: 32,
+                  borderTop: "1px solid var(--bg-border)",
+                }}
+              >
+                <div
+                  className="relative cursor-pointer h-full"
+                  style={{ padding: "3px 0" }}
+                  onMouseDown={handleTimelineMouseDown}
+                >
+                  <div
+                    className="relative h-full overflow-hidden"
+                    style={{
+                      borderRadius: 4,
+                      background: "rgba(255,255,255,.02)",
+                    }}
+                  >
+                    {captionChunks.map((chunk) => {
+                      if (duration <= 0) return null;
+                      const left = (chunk.start / duration) * 100;
+                      const width =
+                        ((chunk.end - chunk.start) / duration) * 100;
+                      return (
+                        <div
+                          key={chunk.id}
+                          className="absolute top-0 bottom-0"
+                          style={{
+                            left: `${left}%`,
+                            width: `${width}%`,
+                            minWidth: 2,
+                            background: captionsEnabled
+                              ? "rgba(255,106,82,.18)"
+                              : "rgba(255,255,255,.06)",
+                            border: captionsEnabled
+                              ? "1px solid rgba(255,106,82,.3)"
+                              : "1px solid rgba(255,255,255,.08)",
+                            borderRadius: 3,
+                            display: "flex",
+                            alignItems: "center",
+                            overflow: "hidden",
+                            padding: "0 4px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 8,
+                              color: captionsEnabled
+                                ? "var(--accent)"
+                                : "var(--text-muted)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              lineHeight: 1,
+                              opacity: 0.85,
+                            }}
+                          >
+                            {chunk.text}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
