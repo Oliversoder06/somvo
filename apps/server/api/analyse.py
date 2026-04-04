@@ -4,17 +4,14 @@ import os
 import shutil
 import tempfile
 from typing import AsyncGenerator
-from uuid import uuid4
 
 import ffmpeg as ffmpeg_lib
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from lib.intent_router import classify_intent
 from lib.step_types import EditStep
 from lib.supabase import get_supabase
-from lib.transcribe_openai import transcribe_video
 from pipelines import get_pipeline
 
 router = APIRouter()
@@ -43,19 +40,6 @@ async def analysis_stream(
     )
     raw_url = project.data["raw_url"]
 
-    # ---- Intent classification ----
-    yield f"data: {json.dumps({'type': 'status', 'message': 'Understanding your request...'})}\n\n"
-
-    classification = classify_intent(prompt)
-
-    if not classification["supported"]:
-        logger.info("[analyse] Unsupported intent — returning info to user: %r", classification["message"])
-        yield f"data: {json.dumps({'type': 'info', 'message': classification['message']})}\n\n"
-        return
-
-    if classification["message"]:
-        yield f"data: {json.dumps({'type': 'status', 'message': classification['message']})}\n\n"
-
     work_dir = tempfile.mkdtemp(prefix=f"somvo_{project_id}_")
     video_path = os.path.join(work_dir, "original.mp4")
 
@@ -71,49 +55,34 @@ async def analysis_stream(
         probe = ffmpeg_lib.probe(video_path)
         duration = float(probe["format"]["duration"])
 
-        intent = classification.get("intent", "clean_edit")
-        steps = []
+        logger.info("[analyse] Starting pipeline=%s  duration=%.1fs  prompt=%r",
+                    pipeline_version, duration, prompt[:80])
+
+        # ── Route everything through the pipeline ───────────────────────────
+        # The pipeline calls lib.intent.parse_intent(prompt) internally and
+        # gates every feature on the returned EditIntent flags.  All intent
+        # classification, status messages, and unsupported-request warnings are
+        # handled inside the pipeline — analyse.py has no routing logic of its own.
+        steps: list[EditStep] = []
         pipeline_log = None
         transcript = None
 
-        logger.info("[analyse] Routing to intent=%r  duration=%.1fs", intent, duration)
+        async for event in pipeline.analyse(video_path, prompt, duration):
+            if event["type"] == "status":
+                yield f"data: {json.dumps({'type': 'status', 'message': event['message']})}\n\n"
+            elif event["type"] == "result":
+                steps = event["steps"]
+                pipeline_log = event["log"]
+                transcript = event["transcript"]
 
-        # ---- Route based on classified intent ----
-        if intent == "captions":
-            logger.info("[analyse] → Captions branch: transcribe only, no silence detection")
-            # Captions only need a transcript + a single caption step
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Transcribing audio...'})}\n\n"
-            transcript = transcribe_video(video_path)
-            word_count = len(transcript["words"])
-            yield f"data: {json.dumps({'type': 'status', 'message': f'Found {word_count} words'})}\n\n"
-
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Preparing captions...'})}\n\n"
-            steps = [
-                EditStep(
-                    id=str(uuid4()),
-                    type="caption",
-                    reason="Burn captions into the video",
-                    start_time=0.0,
-                    end_time=duration,
-                    confidence=10,
-                ),
-            ]
-        else:
-            # Default: run the selected pipeline (v1 silence, etc.)
-            logger.info("[analyse] → Pipeline branch: running %s", pipeline_version)
-            async for event in pipeline.analyse(video_path, prompt, duration):
-                if event["type"] == "status":
-                    yield f"data: {json.dumps({'type': 'status', 'message': event['message']})}\n\n"
-                elif event["type"] == "result":
-                    steps = event["steps"]
-                    pipeline_log = event["log"]
-                    transcript = event["transcript"]
-
-        logger.info("[analyse] Processing complete — %d steps generated", len(steps))
+        logger.info("[analyse] Pipeline complete — %d steps", len(steps))
         for s in steps:
-            logger.debug("[analyse]   step: type=%s  range=%.2f-%.2f  reason=%r", s.type, s.start_time, s.end_time, s.reason)
+            logger.debug("[analyse]   step: type=%s  range=%.2f-%.2f  reason=%r",
+                         s.type, s.start_time, s.end_time, s.reason)
 
-        # Stream each step to the client
+        # ── Stream each step to the frontend ────────────────────────────────
+        # Caption steps use their own event type so the frontend doesn't treat
+        # them as video cuts in the timeline.
         for step in steps:
             step_dict = {
                 "id": step.id,
@@ -124,17 +93,15 @@ async def analysis_stream(
                 "confidence": step.confidence,
                 "status": "pending",
             }
-            # Caption steps use their own event type so the frontend
-            # doesn't treat them as video cuts
             event_type = "caption" if step.type == "caption" else "cut"
             yield f"data: {json.dumps({'type': event_type, 'step': step_dict})}\n\n"
 
-        # Stream pipeline log summary
+        # ── Stream pipeline log summary ──────────────────────────────────────
         if pipeline_log:
             log_summary = pipeline_log.summary()
             yield f"data: {json.dumps({'type': 'log_summary', 'summary': log_summary})}\n\n"
 
-        # Store transcript in Supabase
+        # ── Persist transcript ───────────────────────────────────────────────
         if transcript:
             try:
                 supabase.table("transcripts").upsert(
@@ -145,30 +112,29 @@ async def analysis_stream(
                     },
                     on_conflict="project_id",
                 ).execute()
+                logger.info("[analyse] Transcript saved (%d words)", len(transcript["words"]))
 
-                # Tell the frontend to load captions from the saved transcript
-                if intent == "captions":
-                    yield f"data: {json.dumps({'type': 'captions_ready'})}\n\n"
+                # Tell the frontend the transcript is ready so it can load caption words
+                yield f"data: {json.dumps({'type': 'captions_ready', 'word_count': len(transcript['words'])})}\n\n"
 
-            except Exception as db_err:
-                logger.error("Failed to upsert transcript for project %s: %s", project_id, db_err)
-                yield f"data: {json.dumps({'type': 'error', 'message': f'Failed to save transcript: {db_err}'})}\n\n"
-                return
+            except Exception as exc:
+                logger.error("[analyse] Failed to save transcript: %s", exc)
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Transcript save failed — captions may not display correctly.'})}\n\n"
 
-        # Store edit steps + pipeline log in Supabase
-        steps_payload = [
-            {
-                "id": s.id,
-                "type": s.type,
-                "reason": s.reason,
-                "startTime": s.start_time,
-                "endTime": s.end_time,
-                "confidence": s.confidence,
-                "status": "pending",
-            }
-            for s in steps
-        ]
+        # ── Persist edit steps ───────────────────────────────────────────────
         try:
+            steps_payload = [
+                {
+                    "id": s.id,
+                    "type": s.type,
+                    "reason": s.reason,
+                    "startTime": s.start_time,
+                    "endTime": s.end_time,
+                    "confidence": s.confidence,
+                    "status": "pending",
+                }
+                for s in steps
+            ]
             supabase.table("edit_steps").upsert(
                 {
                     "project_id": project_id,
@@ -177,41 +143,32 @@ async def analysis_stream(
                 },
                 on_conflict="project_id",
             ).execute()
-        except Exception as db_err:
-            logger.error("Failed to upsert edit_steps for project %s: %s", project_id, db_err)
-            yield f"data: {json.dumps({'type': 'error', 'message': f'Failed to save edit steps: {db_err}'})}\n\n"
-            return
+            logger.info("[analyse] edit_steps saved (%d steps)", len(steps))
+        except Exception as exc:
+            logger.error("[analyse] Failed to save edit_steps: %s", exc)
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Failed to save edit steps to database.'})}\n\n"
 
-        # Update project status
+        # ── Mark project as analysed ─────────────────────────────────────────
         try:
             supabase.table("projects").update(
-                {
-                    "status": "ready",
-                    "duration_seconds": int(duration),
-                }
+                {"status": "analysed", "pipeline_version": pipeline_version}
             ).eq("id", project_id).execute()
-        except Exception as db_err:
-            logger.error("Failed to update project status for %s: %s", project_id, db_err)
+        except Exception as exc:
+            logger.error("[analyse] Failed to update project status: %s", exc)
 
-        logger.info("[analyse] ✓ Done — project=%s intent=%s step_count=%d", project_id, intent, len(steps))
-        yield f"data: {json.dumps({'type': 'done', 'step_count': len(steps)})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     except Exception as exc:
-        logger.exception("[analyse] FAILED project=%s intent=%r error=%s", project_id, classification.get("intent"), exc)
-        yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
-        try:
-            supabase.table("projects").update(
-                {"status": "failed"}
-            ).eq("id", project_id).execute()
-        except Exception:
-            pass
+        logger.exception("[analyse] Unhandled error for project %s: %s", project_id, exc)
+        yield f"data: {json.dumps({'type': 'error', 'message': f'Analysis failed: {exc}'})}\n\n"
+        raise
 
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
 @router.post("/analyse")
-async def analyse_video(req: AnalyseRequest):
+async def analyse(req: AnalyseRequest) -> StreamingResponse:
     return StreamingResponse(
         analysis_stream(req.project_id, req.prompt, req.pipeline_version),
         media_type="text/event-stream",
