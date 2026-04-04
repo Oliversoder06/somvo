@@ -114,8 +114,10 @@ async def analysis_stream(
                 ).execute()
                 logger.info("[analyse] Transcript saved (%d words)", len(transcript["words"]))
 
-                # Tell the frontend the transcript is ready so it can load caption words
-                yield f"data: {json.dumps({'type': 'captions_ready', 'word_count': len(transcript['words'])})}\n\n"
+                # Only tell the frontend to enable captions if caption steps were requested
+                has_caption_steps = any(s.type == "caption" for s in steps)
+                if has_caption_steps:
+                    yield f"data: {json.dumps({'type': 'captions_ready', 'word_count': len(transcript['words'])})}\n\n"
 
             except Exception as exc:
                 logger.error("[analyse] Failed to save transcript: %s", exc)

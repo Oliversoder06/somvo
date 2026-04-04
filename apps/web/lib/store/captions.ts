@@ -44,7 +44,6 @@ export const useCaptionStore = create<CaptionStore>((set, get) => ({
     set({
       words,
       chunks: rechunk(words, get().style.maxWords),
-      enabled: words.length > 0,
     }),
 
   setEnabled: (v) => set({ enabled: v }),

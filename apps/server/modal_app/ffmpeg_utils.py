@@ -1,7 +1,11 @@
+import logging
+
 import ffmpeg
 import os
 import shutil
 import tempfile
+
+logger = logging.getLogger(__name__)
 
 
 def extract_audio(video_path: str, output_path: str) -> str:
@@ -59,7 +63,12 @@ def burn_captions(
         When provided, font, size, colour, position and background are applied
         via the ``force_style`` ASS override in the FFmpeg subtitles filter.
     """
-    escaped_path = srt_path.replace("\\", "\\\\").replace(":", "\\:")
+    # FFmpeg's subtitles filter (libass) struggles with Windows paths that
+    # contain backslashes and colons.  Copy the SRT to a simple temp path
+    # to avoid escaping issues entirely on any OS.
+    safe_srt = os.path.join(tempfile.gettempdir(), "somvo_captions.srt")
+    shutil.copy2(srt_path, safe_srt)
+    escaped_path = safe_srt.replace("\\", "/").replace(":", "\\:")
 
     # Build force_style string from caption style settings
     force_parts: list[str] = []
@@ -104,13 +113,17 @@ def burn_captions(
     else:
         vf = f"subtitles={escaped_path}"
 
-    (
-        ffmpeg
-        .input(video_path)
-        .output(output_path, vf=vf)
-        .overwrite_output()
-        .run(quiet=True)
-    )
+    try:
+        (
+            ffmpeg
+            .input(video_path)
+            .output(output_path, vf=vf)
+            .overwrite_output()
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+    except ffmpeg.Error as e:
+        logger.error("burn_captions ffmpeg stderr: %s", e.stderr.decode() if e.stderr else "(none)")
+        raise
     return output_path
 
 

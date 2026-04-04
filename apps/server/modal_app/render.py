@@ -116,7 +116,7 @@ def run_render(
             try:
                 style_result = supabase.table("caption_styles").select("*").eq(
                     "project_id", project_id
-                ).maybeSingle().execute()
+                ).maybe_single().execute()
                 if style_result.data:
                     caption_style = style_result.data
             except Exception:

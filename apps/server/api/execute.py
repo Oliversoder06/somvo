@@ -1,4 +1,5 @@
 import logging
+import os
 
 import modal
 from fastapi import APIRouter, HTTPException
@@ -9,6 +10,11 @@ from lib.supabase import get_supabase
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _is_local_supabase() -> bool:
+    url = os.environ.get("SUPABASE_URL", "")
+    return "127.0.0.1" in url or "localhost" in url
 
 
 class ExecuteRequest(BaseModel):
@@ -52,10 +58,19 @@ async def execute_edits(req: ExecuteRequest):
     ]
 
     try:
-        run_render = modal.Function.from_name("somvo", "run_render")
-        render_result = await run_render.remote.aio(
-            req.project_id, steps_payload, raw_url, user_id,
-        )
+        if _is_local_supabase():
+            # Local Supabase is unreachable from Modal's remote containers.
+            # Run the render function in-process instead.
+            from modal_app.render import run_render
+            logger.info("Running render locally (local Supabase detected)")
+            render_result = run_render.local(
+                req.project_id, steps_payload, raw_url, user_id,
+            )
+        else:
+            run_render = modal.Function.from_name("somvo", "run_render")
+            render_result = await run_render.remote.aio(
+                req.project_id, steps_payload, raw_url, user_id,
+            )
     except Exception as exc:
         logger.exception("Modal render failed for project %s", req.project_id)
         raise HTTPException(status_code=500, detail=str(exc))

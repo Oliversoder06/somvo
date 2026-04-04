@@ -91,7 +91,7 @@ export function useAgentStream(
             if (event.type === "caption")
               addStep({ ...event.step, status: "approved" as const });
             if (event.type === "captions_ready") {
-              // Reload transcript words into caption store from DB
+              // Reload transcript words into caption store from DB and enable captions
               const supabase = createClient();
               supabase
                 .from("transcripts")
@@ -101,6 +101,7 @@ export function useAgentStream(
                 .then(({ data }) => {
                   if (data?.words) {
                     setCaptionWords(data.words as unknown as TranscriptWord[]);
+                    useCaptionStore.getState().setEnabled(true);
                   }
                 });
             }

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useCaptionStore } from "@/lib/store/captions";
+import { useEditorStore } from "@/lib/store/editor";
 import type { TranscriptWord } from "@/lib/captions/types";
 
 /**
@@ -9,6 +10,7 @@ import type { TranscriptWord } from "@/lib/captions/types";
  */
 export function useTranscript(projectId: string | undefined) {
   const setWords = useCaptionStore((s) => s.setWords);
+  const setEnabled = useCaptionStore((s) => s.setEnabled);
   const setStyle = useCaptionStore((s) => s.setStyle);
   const reset = useCaptionStore((s) => s.reset);
   const supabase = createClient();
@@ -33,6 +35,13 @@ export function useTranscript(projectId: string | undefined) {
       if (transcript?.words) {
         const words = transcript.words as unknown as TranscriptWord[];
         setWords(words);
+
+        // Only enable captions if there are caption-type steps in the editor store
+        const steps = useEditorStore.getState().steps;
+        const hasCaptionSteps = steps.some((s) => s.type === "caption");
+        if (hasCaptionSteps) {
+          setEnabled(true);
+        }
       }
 
       // Fetch saved caption style
