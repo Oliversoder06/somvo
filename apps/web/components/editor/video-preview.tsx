@@ -137,38 +137,64 @@ export function VideoPreview({
         </div>
       )}
 
-      {!videoUrl && !isProcessing && (
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 12,
-              background: "rgba(255,255,255,.04)",
-              border: "1px solid var(--bg-border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Play
-              size={18}
+      {!videoUrl &&
+        !isProcessing &&
+        (status === "ready" || status === "done") && (
+          <div className="flex flex-col items-center gap-3 text-center">
+            <Loader2
+              size={24}
               strokeWidth={1.5}
-              style={{ color: "var(--text-muted)", marginLeft: 2 }}
+              className="animate-spin"
+              style={{ color: "var(--accent)" }}
             />
+            <p
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--text-muted)",
+                letterSpacing: "0.02em",
+              }}
+            >
+              Loading video...
+            </p>
           </div>
-          <p
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              color: "var(--text-muted)",
-              letterSpacing: "0.02em",
-            }}
-          >
-            No video loaded
-          </p>
-        </div>
-      )}
+        )}
+
+      {!videoUrl &&
+        !isProcessing &&
+        status !== "ready" &&
+        status !== "done" && (
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                background: "rgba(255,255,255,.04)",
+                border: "1px solid var(--bg-border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Play
+                size={18}
+                strokeWidth={1.5}
+                style={{ color: "var(--text-muted)", marginLeft: 2 }}
+              />
+            </div>
+            <p
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--text-muted)",
+                letterSpacing: "0.02em",
+              }}
+            >
+              No video loaded
+            </p>
+          </div>
+        )}
     </div>
   );
 }

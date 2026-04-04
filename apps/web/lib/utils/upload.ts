@@ -73,28 +73,32 @@ export async function uploadVideo(
     return { error: updateErr.message };
   }
 
-  try {
-    const { thumbnailUrl, durationSeconds } = await extractThumbnail(file);
-    if (thumbnailUrl) {
-      const thumbResp = await fetch(thumbnailUrl);
-      const thumbBlob = await thumbResp.blob();
-      await supabase.storage
-        .from("raw")
-        .upload(`${user.id}/${project.id}/thumbnail.jpg`, thumbBlob, {
-          contentType: "image/jpeg",
-          upsert: true,
-        });
-      URL.revokeObjectURL(thumbnailUrl);
-    }
-    if (durationSeconds > 0) {
-      await supabase
-        .from("projects")
-        .update({ duration_seconds: Math.round(durationSeconds) })
-        .eq("id", project.id);
-    }
-  } catch {
-    // Thumbnail extraction is non-critical
-  }
+  // Fire-and-forget: thumbnail extraction uses FFmpeg WASM which can be very
+  // slow (it decodes the whole video to probe duration). Don't block the
+  // redirect on it — the project is already "ready".
+  extractThumbnail(file)
+    .then(async ({ thumbnailUrl, durationSeconds }) => {
+      if (thumbnailUrl) {
+        const thumbResp = await fetch(thumbnailUrl);
+        const thumbBlob = await thumbResp.blob();
+        await supabase.storage
+          .from("raw")
+          .upload(`${user.id}/${project.id}/thumbnail.jpg`, thumbBlob, {
+            contentType: "image/jpeg",
+            upsert: true,
+          });
+        URL.revokeObjectURL(thumbnailUrl);
+      }
+      if (durationSeconds > 0) {
+        await supabase
+          .from("projects")
+          .update({ duration_seconds: Math.round(durationSeconds) })
+          .eq("id", project.id);
+      }
+    })
+    .catch(() => {
+      // Thumbnail extraction is non-critical
+    });
 
   return { projectId: project.id };
 }

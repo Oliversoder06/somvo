@@ -14,7 +14,6 @@ logging.basicConfig(
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.process import router as process_router
 from api.execute import router as execute_router
 from api.analyse import router as analyse_router
 
@@ -31,7 +30,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(process_router, prefix="/api")
 app.include_router(execute_router, prefix="/api")
 app.include_router(analyse_router, prefix="/api")
 
