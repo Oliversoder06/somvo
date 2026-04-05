@@ -222,7 +222,7 @@ export function AgentPanel({
         width: agentPanelOpen ? 320 : 0,
         minWidth: agentPanelOpen ? 320 : 0,
         background: "var(--bg-surface)",
-        borderLeft: agentPanelOpen ? "1px solid var(--bg-border)" : "none",
+        borderRadius: agentPanelOpen ? 10 : 0,
         transition: "width 200ms ease, min-width 200ms ease",
         overflow: "hidden",
         position: "relative",
@@ -231,27 +231,14 @@ export function AgentPanel({
       {/* Header */}
       <div
         style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--bg-border)",
+          padding: "14px 16px",
+          borderBottom: "1px solid var(--panel-border)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           position: "relative",
         }}
       >
-        {/* Gradient accent line */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 1,
-            background:
-              "linear-gradient(90deg, var(--accent-from), var(--accent-to))",
-            opacity: 0.3,
-          }}
-        />
         <div ref={dropdownRef} style={{ position: "relative" }}>
           <button
             onClick={() => setDropdownOpen((o) => !o)}
@@ -479,7 +466,7 @@ export function AgentPanel({
       {/* Scrollable body */}
       <div
         className="flex-1 overflow-y-auto min-h-0"
-        style={{ padding: "0 12px" }}
+        style={{ padding: "0 14px" }}
       >
         {/* Empty state */}
         {showEmpty && (
@@ -491,7 +478,7 @@ export function AgentPanel({
               style={{
                 width: 52,
                 height: 52,
-                borderRadius: 14,
+                borderRadius: 18,
                 background: "var(--bg-elevated)",
                 border: "1px solid var(--bg-border)",
                 display: "flex",
@@ -597,11 +584,11 @@ export function AgentPanel({
           <>
             <div
               style={{
-                background: "var(--bg-elevated)",
-                borderRadius: 8,
-                padding: "10px 12px",
-                margin: "10px 0 8px",
-                border: "1px solid var(--bg-border)",
+                background: "rgba(255,255,255,.02)",
+                borderRadius: 12,
+                padding: "12px 14px",
+                margin: "12px 0 10px",
+                border: "1px solid var(--panel-border)",
               }}
             >
               <div
@@ -698,7 +685,7 @@ export function AgentPanel({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    borderRadius: 8,
+                    borderRadius: 12,
                     background: "rgba(0,0,0,.45)",
                     backdropFilter: "blur(2px)",
                   }}
@@ -770,8 +757,8 @@ export function AgentPanel({
       {hasSteps && agentState === "done" && (
         <div
           style={{
-            padding: "8px 12px",
-            borderTop: "1px solid var(--bg-border)",
+            padding: "10px 14px",
+            borderTop: "1px solid var(--panel-border)",
           }}
         >
           {confirmError && (
@@ -797,16 +784,16 @@ export function AgentPanel({
                 overflow: "hidden",
                 background: hasApproved
                   ? isConfirming
-                    ? "var(--bg-elevated)"
+                    ? "rgba(255,255,255,.04)"
                     : "linear-gradient(135deg, var(--accent-from), var(--accent-to))"
-                  : "var(--bg-elevated)",
+                  : "rgba(255,255,255,.03)",
                 color: hasApproved ? "#fff" : "var(--text-muted)",
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-mono)",
                 fontSize: 12,
-                fontWeight: 700,
+                fontWeight: 600,
                 letterSpacing: "0.02em",
-                padding: "10px 0",
-                borderRadius: 8,
+                padding: "11px 0",
+                borderRadius: 10,
                 textAlign: "center",
                 cursor:
                   hasApproved && !isConfirming ? "pointer" : "not-allowed",
@@ -814,16 +801,16 @@ export function AgentPanel({
                   ? isConfirming
                     ? "1px solid rgba(255,255,255,.06)"
                     : "none"
-                  : "1px solid var(--bg-border)",
-                opacity: hasApproved ? 1 : 0.5,
+                  : "1px solid var(--panel-border)",
+                opacity: hasApproved ? 1 : 0.4,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 6,
                 boxShadow: hasApproved
                   ? isConfirming
-                    ? `0 0 ${12 + confirmProgress * 0.2}px rgba(255,106,82,${0.15 + confirmProgress * 0.003})`
-                    : "0 0 20px rgba(255,106,82,.2)"
+                    ? `0 0 ${8 + confirmProgress * 0.15}px rgba(255,106,82,${0.1 + confirmProgress * 0.002})`
+                    : "0 2px 16px rgba(255,77,109,.2), 0 0 0 1px rgba(255,77,109,.1)"
                   : "none",
                 transition: "all 200ms ease",
                 isolation: "isolate",
@@ -842,7 +829,7 @@ export function AgentPanel({
                     bottom: 0,
                     background:
                       "linear-gradient(135deg, var(--accent-from), var(--accent-to))",
-                    borderRadius: 8,
+                    borderRadius: 10,
                     zIndex: 0,
                   }}
                 />
@@ -877,16 +864,16 @@ export function AgentPanel({
               onClick={onDiscard}
               disabled={isConfirming}
               style={{
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: "1px solid var(--bg-border)",
+                padding: "11px 14px",
+                borderRadius: 10,
+                border: "1px solid var(--panel-border)",
                 background: "transparent",
                 color: "var(--text-muted)",
-                fontFamily: "var(--font-display)",
+                fontFamily: "var(--font-mono)",
                 fontSize: 12,
-                fontWeight: 600,
+                fontWeight: 500,
                 cursor: isConfirming ? "not-allowed" : "pointer",
-                opacity: isConfirming ? 0.4 : 1,
+                opacity: isConfirming ? 0.35 : 0.6,
                 transition: "all 150ms ease",
                 display: "flex",
                 alignItems: "center",
@@ -900,11 +887,11 @@ export function AgentPanel({
         </div>
       )}
 
-      {/* ---- Prompt input area (pinned bottom, like Cardboard) ---- */}
+      {/* ---- Prompt input area (pinned bottom) ---- */}
       <div
         style={{
-          padding: "10px 12px 12px",
-          borderTop: "1px solid var(--bg-border)",
+          padding: "10px 14px 14px",
+          borderTop: "1px solid var(--panel-border)",
         }}
       >
         {/* Quick actions */}
@@ -954,9 +941,9 @@ export function AgentPanel({
             className="editor-input"
             style={{
               width: "100%",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--bg-border)",
-              borderRadius: 10,
+              background: "rgba(255,255,255,.03)",
+              border: "1px solid var(--panel-border)",
+              borderRadius: 14,
               height: 40,
               padding: "0 40px 0 14px",
               fontFamily: "var(--font-body)",
@@ -976,7 +963,7 @@ export function AgentPanel({
               transform: "translateY(-50%)",
               width: 28,
               height: 28,
-              borderRadius: 8,
+              borderRadius: 10,
               border: "none",
               background:
                 prompt.trim() && !isStreaming ? "var(--accent)" : "transparent",

@@ -92,17 +92,10 @@ export function TransportBar({
     <div
       className="shrink-0 flex items-center justify-between"
       style={{
-        height: 48,
-        background: "var(--bg-surface)",
-        borderTop: previewMode
-          ? "1px solid rgba(255,106,82,.35)"
-          : "1px solid var(--bg-border)",
-        borderBottom: "1px solid var(--bg-border)",
+        height: 44,
+        background: "transparent",
         padding: "0 16px",
-        boxShadow: previewMode
-          ? "inset 0 1px 8px rgba(255,106,82,.08)"
-          : "none",
-        transition: "border-top 200ms ease, box-shadow 200ms ease",
+        transition: "all 200ms ease",
       }}
     >
       {/* Left: Preview toggle + timecode */}
@@ -110,10 +103,10 @@ export function TransportBar({
         <div
           className="flex items-center"
           style={{
-            background: "var(--bg-elevated)",
-            borderRadius: 8,
-            padding: 3,
-            border: "1px solid var(--bg-border)",
+            background: "rgba(255,255,255,.03)",
+            borderRadius: 12,
+            padding: 2,
+            border: "1px solid var(--panel-border)",
             position: "relative",
           }}
         >
@@ -121,19 +114,17 @@ export function TransportBar({
           <div
             style={{
               position: "absolute",
-              top: 3,
-              left: previewMode ? "calc(50% + 1px)" : 3,
-              width: "calc(50% - 4px)",
-              height: "calc(100% - 6px)",
-              borderRadius: 5,
+              top: 2,
+              left: previewMode ? "calc(50% + 1px)" : 2,
+              width: "calc(50% - 3px)",
+              height: "calc(100% - 4px)",
+              borderRadius: 10,
               background: previewMode
                 ? "linear-gradient(135deg, var(--accent-from), var(--accent-to))"
-                : "rgba(255,255,255,.1)",
-              boxShadow: previewMode
-                ? "0 0 12px rgba(255,106,82,.25)"
-                : "0 1px 2px rgba(0,0,0,.3)",
+                : "rgba(255,255,255,.08)",
+              boxShadow: previewMode ? "0 0 8px rgba(255,106,82,.2)" : "none",
               transition:
-                "left 200ms ease, background 200ms ease, box-shadow 200ms ease",
+                "left 200ms cubic-bezier(.4,0,.2,1), background 200ms ease, box-shadow 200ms ease",
               zIndex: 0,
             }}
           />
@@ -142,16 +133,17 @@ export function TransportBar({
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: 10,
-              fontWeight: !previewMode ? 600 : 400,
-              padding: "5px 12px",
-              borderRadius: 5,
+              fontWeight: 500,
+              padding: "4px 14px",
+              borderRadius: 10,
               border: "none",
               cursor: "pointer",
               background: "transparent",
               color: !previewMode ? "var(--text-primary)" : "var(--text-muted)",
-              transition: "all 150ms ease",
+              transition: "color 150ms ease",
               position: "relative",
               zIndex: 1,
+              letterSpacing: "0.01em",
             }}
           >
             Original
@@ -161,16 +153,17 @@ export function TransportBar({
             style={{
               fontFamily: "var(--font-mono)",
               fontSize: 10,
-              fontWeight: previewMode ? 600 : 400,
-              padding: "5px 12px",
-              borderRadius: 5,
+              fontWeight: 500,
+              padding: "4px 14px",
+              borderRadius: 10,
               border: "none",
               cursor: "pointer",
               background: "transparent",
               color: previewMode ? "#fff" : "var(--text-muted)",
-              transition: "all 150ms ease",
+              transition: "color 150ms ease",
               position: "relative",
               zIndex: 1,
+              letterSpacing: "0.01em",
             }}
           >
             Preview
@@ -180,15 +173,15 @@ export function TransportBar({
         <span
           style={{
             fontFamily: "var(--font-mono)",
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 500,
-            color: "var(--text-primary)",
+            color: "var(--text-secondary)",
             fontVariantNumeric: "tabular-nums",
             letterSpacing: "0.02em",
           }}
         >
           {formatTimecode(currentTime)}
-          <span style={{ color: "var(--text-muted)" }}>
+          <span style={{ color: "var(--text-muted)", opacity: 0.6 }}>
             {" / "}
             {formatTimecode(displayDuration)}
           </span>
@@ -196,14 +189,14 @@ export function TransportBar({
       </div>
 
       {/* Centre: Transport */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1">
         <button
           onClick={skipBack}
           disabled={disabled}
           className="transport-btn"
           title="Back 5s (J)"
         >
-          <SkipBack size={14} strokeWidth={1.5} />
+          <SkipBack size={13} strokeWidth={1.5} />
         </button>
         <button
           onClick={togglePlay}
@@ -212,9 +205,9 @@ export function TransportBar({
           title="Play/Pause (Space)"
         >
           {isPlaying ? (
-            <Pause size={14} strokeWidth={1.5} />
+            <Pause size={13} strokeWidth={1.5} />
           ) : (
-            <Play size={14} strokeWidth={1.5} style={{ marginLeft: 1 }} />
+            <Play size={13} strokeWidth={1.5} style={{ marginLeft: 1 }} />
           )}
         </button>
         <button
@@ -223,7 +216,7 @@ export function TransportBar({
           className="transport-btn"
           title="Forward 5s (L)"
         >
-          <SkipForward size={14} strokeWidth={1.5} />
+          <SkipForward size={13} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -235,7 +228,7 @@ export function TransportBar({
           className="transport-btn"
           title="Zoom out"
         >
-          <ZoomOut size={14} strokeWidth={1.5} />
+          <ZoomOut size={13} strokeWidth={1.5} />
         </button>
         <span
           style={{
@@ -244,6 +237,7 @@ export function TransportBar({
             color: "var(--text-muted)",
             minWidth: 36,
             textAlign: "center",
+            opacity: 0.7,
           }}
         >
           {Math.round(zoom * 100)}%
@@ -254,12 +248,12 @@ export function TransportBar({
           className="transport-btn"
           title="Zoom in"
         >
-          <ZoomIn size={14} strokeWidth={1.5} />
+          <ZoomIn size={13} strokeWidth={1.5} />
         </button>
         <Volume2
-          size={14}
+          size={13}
           strokeWidth={1.5}
-          style={{ color: "var(--text-muted)", marginLeft: 4 }}
+          style={{ color: "var(--text-muted)", marginLeft: 4, opacity: 0.5 }}
         />
       </div>
     </div>

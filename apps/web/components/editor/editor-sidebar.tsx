@@ -31,15 +31,15 @@ export function EditorSidebar() {
     <div
       className="shrink-0 flex flex-col items-center"
       style={{
-        width: 48,
+        width: 52,
         background: "var(--bg-surface)",
-        borderRight: "1px solid var(--bg-border)",
-        paddingTop: 12,
-        paddingBottom: 12,
+        borderRadius: 10,
+        paddingTop: 14,
+        paddingBottom: 14,
       }}
     >
       {/* Tool icons */}
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1.5">
         {tools.map((tool) => {
           const Icon = tool.icon;
           const isActive = active === tool.id;
@@ -51,13 +51,13 @@ export function EditorSidebar() {
               title={tool.label}
               className="sidebar-tool-btn"
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 8,
+                width: 36,
+                height: 36,
+                borderRadius: 10,
                 border: "none",
                 background:
                   isActive && isEnabled
-                    ? "rgba(255,255,255,.08)"
+                    ? "rgba(255,255,255,.06)"
                     : "transparent",
                 color: !isEnabled
                   ? "var(--text-muted)"
@@ -83,7 +83,7 @@ export function EditorSidebar() {
                     fontFamily: "var(--font-mono)",
                     fontSize: 7,
                     color: "var(--text-muted)",
-                    opacity: isActive ? 0.6 : 0.3,
+                    opacity: isActive ? 0.5 : 0.25,
                   }}
                 >
                   {tool.shortcut}
@@ -100,11 +100,11 @@ export function EditorSidebar() {
         title="Caption styles"
         className="sidebar-tool-btn"
         style={{
-          width: 34,
-          height: 34,
-          borderRadius: 8,
+          width: 36,
+          height: 36,
+          borderRadius: 10,
           border: "none",
-          background: captionPanelOpen ? "rgba(255,106,82,.12)" : "transparent",
+          background: captionPanelOpen ? "rgba(255,106,82,.1)" : "transparent",
           color: captionPanelOpen
             ? "var(--accent)"
             : hasCaptions
@@ -115,8 +115,8 @@ export function EditorSidebar() {
           alignItems: "center",
           justifyContent: "center",
           transition: "all 120ms ease",
-          opacity: hasCaptions ? 1 : 0.4,
-          marginTop: 4,
+          opacity: hasCaptions ? 1 : 0.35,
+          marginTop: 6,
         }}
       >
         <Subtitles size={16} strokeWidth={1.5} />
@@ -131,7 +131,7 @@ export function EditorSidebar() {
         style={{
           width: 34,
           height: 34,
-          borderRadius: 8,
+          borderRadius: 10,
           border: "none",
           background: "transparent",
           color: "var(--text-muted)",

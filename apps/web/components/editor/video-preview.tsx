@@ -42,7 +42,8 @@ export function VideoPreview({
     <div
       className="flex-1 relative flex items-center justify-center overflow-hidden"
       style={{
-        background: "#000",
+        background: "var(--bg-canvas)",
+        borderRadius: 10,
       }}
     >
       {/* Preview mode badge */}
@@ -58,7 +59,7 @@ export function VideoPreview({
             gap: 6,
             background: "rgba(255,106,82,.15)",
             border: "1px solid rgba(255,106,82,.3)",
-            borderRadius: 6,
+            borderRadius: 10,
             padding: "4px 10px",
             backdropFilter: "blur(8px)",
           }}
@@ -171,7 +172,7 @@ export function VideoPreview({
               style={{
                 width: 48,
                 height: 48,
-                borderRadius: 12,
+                borderRadius: 16,
                 background: "rgba(255,255,255,.04)",
                 border: "1px solid var(--bg-border)",
                 display: "flex",

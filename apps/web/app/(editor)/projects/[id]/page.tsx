@@ -235,26 +235,40 @@ export default function EditorPage() {
       className="flex"
       style={{
         height: "100%",
-        background: "var(--bg-base)",
         overflow: "hidden",
         position: "relative",
+        gap: 6,
       }}
     >
       {/* Left icon sidebar */}
       <EditorSidebar />
 
       {/* ---- Centre: video + transport + timeline stacked ---- */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0" style={{ gap: 6 }}>
         {/* Video canvas - fills remaining space */}
-        <div className="flex-1 min-h-0 flex flex-col">
+        <div
+          className="flex-1 min-h-0 flex flex-col"
+          style={{
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "var(--bg-surface)",
+          }}
+        >
           <VideoPreview playerRef={playerRef} />
+          {/* Transport bar */}
+          <TransportBar playerRef={playerRef} />
         </div>
 
-        {/* Transport bar */}
-        <TransportBar playerRef={playerRef} />
-
         {/* Timeline */}
-        <Timeline playerRef={playerRef} />
+        <div
+          style={{
+            borderRadius: 10,
+            overflow: "hidden",
+            background: "var(--bg-surface)",
+          }}
+        >
+          <Timeline playerRef={playerRef} />
+        </div>
       </div>
 
       {/* Right director/agent panel - full height, collapsible */}
@@ -277,9 +291,9 @@ export default function EditorPage() {
             right: 12,
             width: 32,
             height: 32,
-            borderRadius: 8,
-            border: "1px solid var(--bg-border)",
-            background: "var(--bg-surface)",
+            borderRadius: 10,
+            border: "1px solid var(--panel-border)",
+            background: "var(--bg-sidebar)",
             color: "var(--text-secondary)",
             cursor: "pointer",
             display: "flex",

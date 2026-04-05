@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
+import { Film, AudioLines, Subtitles } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
 import { useCaptionStore } from "@/lib/store/captions";
 import { useWaveform } from "@/lib/hooks/use-waveform";
@@ -291,8 +292,7 @@ export function Timeline({
       className="shrink-0 flex flex-col"
       style={{
         height: timelineHeight,
-        background: "var(--timeline-bg)",
-        borderTop: "1px solid var(--bg-border)",
+        background: "var(--bg-surface)",
         position: "relative",
       }}
     >
@@ -311,10 +311,10 @@ export function Timeline({
       >
         <div
           style={{
-            width: 32,
-            height: 3,
-            borderRadius: 2,
-            background: "var(--bg-border)",
+            width: 28,
+            height: 2,
+            borderRadius: 1,
+            background: "rgba(255,255,255,.08)",
             margin: "1px auto 0",
             transition: "background 150ms ease",
           }}
@@ -324,10 +324,13 @@ export function Timeline({
       {/* Timecode ruler */}
       <div
         className="shrink-0 flex"
-        style={{ height: 24, borderBottom: "1px solid var(--bg-border)" }}
+        style={{
+          height: 24,
+          borderBottom: "1px solid var(--panel-border-subtle)",
+        }}
       >
         {/* Ruler label spacer */}
-        <div className="shrink-0" style={{ width: 60 }} />
+        <div className="shrink-0" style={{ width: 72 }} />
         {/* Scrollable ruler */}
         <div
           ref={rulerScrollRef}
@@ -393,6 +396,7 @@ export function Timeline({
                   bottom: -1,
                   left: 0,
                   borderRadius: 1,
+                  boxShadow: "0 0 4px var(--playhead-glow)",
                 }}
               />
             </div>
@@ -403,40 +407,52 @@ export function Timeline({
       {/* Scrollable tracks area */}
       <div className="flex-1 flex min-h-0">
         {/* Track labels (fixed) */}
-        <div className="shrink-0 flex flex-col" style={{ width: 60 }}>
+        <div className="shrink-0 flex flex-col" style={{ width: 72 }}>
           <div
-            className="flex-1 flex items-center justify-end"
+            className="flex-1 flex items-center justify-end gap-1.5"
             style={{
-              paddingRight: 10,
-              borderRight: "1px solid var(--bg-border)",
+              paddingRight: 12,
+              borderRight: "1px solid var(--panel-border)",
             }}
           >
+            <Film
+              size={10}
+              strokeWidth={1.5}
+              style={{ color: "var(--text-muted)", opacity: 0.6 }}
+            />
             <span
               style={{
                 fontFamily: "var(--font-mono)",
                 fontSize: 10,
                 color: "var(--text-secondary)",
                 fontWeight: 500,
+                letterSpacing: "0.02em",
               }}
             >
               Main
             </span>
           </div>
           <div
-            className="flex items-center justify-end"
+            className="flex items-center justify-end gap-1.5"
             style={{
               height: 48,
-              paddingRight: 10,
-              borderRight: "1px solid var(--bg-border)",
-              borderTop: "1px solid var(--bg-border)",
+              paddingRight: 12,
+              borderRight: "1px solid var(--panel-border)",
+              borderTop: "1px solid var(--panel-border-subtle)",
             }}
           >
+            <AudioLines
+              size={10}
+              strokeWidth={1.5}
+              style={{ color: "var(--text-muted)", opacity: 0.6 }}
+            />
             <span
               style={{
                 fontFamily: "var(--font-mono)",
                 fontSize: 10,
                 color: "var(--text-muted)",
                 fontWeight: 500,
+                letterSpacing: "0.02em",
               }}
             >
               Audio
@@ -444,14 +460,24 @@ export function Timeline({
           </div>
           {hasCaptions && (
             <div
-              className="flex items-center justify-end"
+              className="flex items-center justify-end gap-1.5"
               style={{
                 height: 32,
-                paddingRight: 10,
-                borderRight: "1px solid var(--bg-border)",
-                borderTop: "1px solid var(--bg-border)",
+                paddingRight: 12,
+                borderRight: "1px solid var(--panel-border)",
+                borderTop: "1px solid var(--panel-border-subtle)",
               }}
             >
+              <Subtitles
+                size={10}
+                strokeWidth={1.5}
+                style={{
+                  color: captionsEnabled
+                    ? "var(--accent)"
+                    : "var(--text-muted)",
+                  opacity: captionsEnabled ? 0.8 : 0.6,
+                }}
+              />
               <span
                 style={{
                   fontFamily: "var(--font-mono)",
@@ -460,6 +486,7 @@ export function Timeline({
                     ? "var(--accent)"
                     : "var(--text-muted)",
                   fontWeight: 500,
+                  letterSpacing: "0.02em",
                 }}
               >
                 Subs
@@ -489,12 +516,27 @@ export function Timeline({
               className="absolute top-0 bottom-0 z-20 pointer-events-none"
               style={{
                 left: 0,
-                width: 2,
+                width: 1,
                 background: "var(--playhead)",
-                boxShadow: "0 0 6px var(--playhead)",
-                borderRadius: 1,
+                boxShadow: "0 0 4px var(--playhead-glow)",
+                borderRadius: 0,
               }}
-            />
+            >
+              {/* Small handle at top */}
+              <div
+                style={{
+                  position: "absolute",
+                  top: -1,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "var(--playhead)",
+                  boxShadow: "0 0 6px var(--playhead-glow)",
+                }}
+              />
+            </div>
 
             {/* Main video track */}
             <div className="flex-1 min-h-0">
@@ -507,7 +549,7 @@ export function Timeline({
                   className="relative h-full overflow-hidden"
                   style={{
                     background: "rgba(255,255,255,.03)",
-                    borderRadius: 4,
+                    borderRadius: 6,
                     border: "1px solid rgba(255,255,255,.04)",
                   }}
                 >
@@ -541,7 +583,7 @@ export function Timeline({
             <div
               style={{
                 height: 48,
-                borderTop: "1px solid var(--bg-border)",
+                borderTop: "1px solid var(--panel-border-subtle)",
               }}
             >
               <div
@@ -552,7 +594,7 @@ export function Timeline({
                 <div
                   className="relative h-full overflow-hidden"
                   style={{
-                    borderRadius: 4,
+                    borderRadius: 6,
                     background: "rgba(255,255,255,.02)",
                   }}
                 >
@@ -570,7 +612,7 @@ export function Timeline({
               <div
                 style={{
                   height: 32,
-                  borderTop: "1px solid var(--bg-border)",
+                  borderTop: "1px solid var(--panel-border-subtle)",
                 }}
               >
                 <div
@@ -581,7 +623,7 @@ export function Timeline({
                   <div
                     className="relative h-full overflow-hidden"
                     style={{
-                      borderRadius: 4,
+                      borderRadius: 6,
                       background: "rgba(255,255,255,.02)",
                     }}
                   >
@@ -604,7 +646,7 @@ export function Timeline({
                             border: captionsEnabled
                               ? "1px solid rgba(255,106,82,.3)"
                               : "1px solid rgba(255,255,255,.08)",
-                            borderRadius: 3,
+                            borderRadius: 5,
                             display: "flex",
                             alignItems: "center",
                             overflow: "hidden",
@@ -644,8 +686,8 @@ export function Timeline({
           className="shrink-0 flex items-center justify-end"
           style={{
             height: 20,
-            padding: "0 8px",
-            borderTop: "1px solid var(--bg-border)",
+            padding: "0 10px",
+            borderTop: "1px solid var(--panel-border-subtle)",
           }}
         >
           <span
@@ -653,7 +695,7 @@ export function Timeline({
               fontFamily: "var(--font-mono)",
               fontSize: 9,
               color: "var(--danger)",
-              opacity: 0.6,
+              opacity: 0.5,
             }}
           >
             {approvedCuts} approved cut{approvedCuts !== 1 ? "s" : ""}

@@ -230,7 +230,7 @@ export function CaptionStylePanel() {
         maxHeight: "calc(100% - 16px)",
         background: "var(--bg-surface)",
         border: "1px solid var(--bg-border)",
-        borderRadius: 12,
+        borderRadius: 16,
         zIndex: 30,
         display: "flex",
         flexDirection: "column",

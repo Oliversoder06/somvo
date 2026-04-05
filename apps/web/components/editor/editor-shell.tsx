@@ -1,6 +1,6 @@
 "use client";
 
-import { EditorTopbar } from "./editor-topbar";
+import { Topbar } from "@/components/topbar";
 
 export function EditorShell({ children }: { children: React.ReactNode }) {
   return (
@@ -10,13 +10,15 @@ export function EditorShell({ children }: { children: React.ReactNode }) {
         height: "100vh",
         background: "var(--bg-base)",
         position: "relative",
+        padding: 6,
+        gap: 6,
       }}
     >
       <div className="editor-glow" />
-      <EditorTopbar />
+      <Topbar mode="editor" />
       <div
         className="flex-1 min-h-0 overflow-hidden"
-        style={{ position: "relative", zIndex: 1 }}
+        style={{ position: "relative", zIndex: 1, gap: 6 }}
       >
         {children}
       </div>

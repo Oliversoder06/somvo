@@ -4,10 +4,18 @@
 
 :root {
   /* Backgrounds */
-  --bg-base: #090608;
-  --bg-surface: #0d0a10;
-  --bg-elevated: #141018;
+  --bg-base: #050305;
+  --bg-surface: #121016;
+  --bg-elevated: #1a1620;
   --bg-border: #1e1a24;
+
+  /* Panel depth variants — subtle shade differences between regions */
+  --bg-sidebar: #0d0b0e;
+  --bg-canvas: #060406;
+  --bg-timeline: #0a080c;
+  --bg-topbar: #0c0a0f;
+  --panel-border: rgba(255, 255, 255, 0.06);
+  --panel-border-subtle: rgba(255, 255, 255, 0.03);
 
   /* Accent gradient - coral to amber */
   --accent-from: #ff4d6d;
@@ -15,11 +23,13 @@
   --accent: #ff6a52;
   --accent-dim: #ff6a5210;
   --accent-hover: #ff5c3e;
+  --accent-subtle: rgba(255, 106, 82, 0.08);
 
   /* Text */
   --text-primary: #f0ebe8;
   --text-secondary: #8b8886;
   --text-muted: #4a4846;
+  --text-faint: #332f2d;
 
   /* Semantic */
   --success: #3ecf8e;
@@ -28,12 +38,13 @@
   --warning: #fbbf24;
 
   /* Timeline */
-  --timeline-bg: #080508;
-  --waveform: rgba(255, 106, 82, 0.3);
-  --waveform-act: #ff6a52;
+  --timeline-bg: #0a080c;
+  --waveform: rgba(255, 106, 82, 0.18);
+  --waveform-act: rgba(255, 106, 82, 0.55);
   --cut-region: rgba(229, 72, 77, 0.2);
   --cut-border: rgba(229, 72, 77, 0.45);
-  --playhead: #ff6a52;
+  --playhead: #ffffff;
+  --playhead-glow: rgba(255, 255, 255, 0.2);
 
   /* Typography */
   --font-display: "Syne", sans-serif;
@@ -65,6 +76,9 @@
   --color-surface: var(--bg-surface);
   --color-elevated: var(--bg-elevated);
   --color-border: var(--bg-border);
+  --color-sidebar: var(--bg-sidebar);
+  --color-canvas: var(--bg-canvas);
+  --color-timeline: var(--bg-timeline);
 
   --color-accent: var(--accent);
   --color-accent-dim: var(--accent-dim);
@@ -243,8 +257,8 @@ body {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 2px 7px;
-  border-radius: 3px;
+  padding: 2px 8px;
+  border-radius: 6px;
 }
 
 .badge-uploading {
@@ -281,6 +295,15 @@ body {
   border: 1px solid rgba(229, 72, 77, 0.15);
 }
 
+/* Card container (settings, etc.) */
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+
 /* Editor Layout */
 
 .editor-glow {
@@ -289,12 +312,12 @@ body {
   background:
     radial-gradient(
       ellipse 60% 40% at 30% 0%,
-      rgba(255, 70, 95, 0.04) 0%,
+      rgba(255, 70, 95, 0.025) 0%,
       transparent 60%
     ),
     radial-gradient(
       ellipse 40% 50% at 100% 50%,
-      rgba(255, 120, 45, 0.03) 0%,
+      rgba(255, 120, 45, 0.02) 0%,
       transparent 55%
     );
   pointer-events: none;
@@ -306,7 +329,7 @@ body {
 .transport-btn {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
@@ -318,7 +341,7 @@ body {
 }
 
 .transport-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
 }
 
@@ -328,16 +351,16 @@ body {
 }
 
 .transport-btn-play {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .transport-btn-play:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Sidebar tool buttons */
@@ -347,7 +370,7 @@ body {
   align-items: center;
   gap: 2px;
   padding: 6px 4px;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
   border: none;
   background: transparent;
@@ -375,8 +398,8 @@ body {
   font-size: 11px;
   color: var(--text-secondary);
   border: 1px solid var(--bg-border);
-  border-radius: 8px;
-  padding: 5px 10px;
+  border-radius: 20px;
+  padding: 5px 12px;
   background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   white-space: nowrap;
