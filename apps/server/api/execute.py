@@ -46,16 +46,20 @@ async def execute_edits(req: ExecuteRequest):
     user_id = project["user_id"]
 
     # Serialise steps as plain dicts for Modal
-    steps_payload = [
-        {
+    steps_payload = []
+    for s in req.approved_steps:
+        step_dict = {
             "id": s.id,
             "type": s.type,
             "reason": s.reason,
             "start_time": s.start_time,
             "end_time": s.end_time,
         }
-        for s in req.approved_steps
-    ]
+        if s.type == "broll":
+            step_dict["clip_url"] = s.clip_url
+            step_dict["clip_id"] = s.clip_id
+            step_dict["query"] = s.query
+        steps_payload.append(step_dict)
 
     try:
         if _is_local_supabase():

@@ -88,6 +88,8 @@ export function useAgentStream(
             }
             if (event.type === "cut")
               addStep({ ...event.step, status: "approved" as const });
+            if (event.type === "broll")
+              addStep({ ...event.step, status: "approved" as const });
             if (event.type === "caption")
               addStep({ ...event.step, status: "approved" as const });
             if (event.type === "captions_ready") {

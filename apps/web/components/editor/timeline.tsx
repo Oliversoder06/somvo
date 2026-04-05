@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
-import { Film, AudioLines, Subtitles } from "lucide-react";
+import { Film, AudioLines, Subtitles, Clapperboard } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor";
 import { useCaptionStore } from "@/lib/store/captions";
 import { useWaveform } from "@/lib/hooks/use-waveform";
@@ -54,6 +54,12 @@ export function Timeline({
   const captionChunks = useCaptionStore((s) => s.chunks);
   const captionsEnabled = useCaptionStore((s) => s.enabled);
   const hasCaptions = captionChunks.length > 0;
+
+  const brollSteps = useMemo(
+    () => steps.filter((s) => s.type === "broll"),
+    [steps],
+  );
+  const hasBroll = brollSteps.length > 0;
 
   const waveformRef = useRef<HTMLDivElement>(null);
   const playheadRef = useRef<HTMLDivElement>(null);
@@ -221,7 +227,8 @@ export function Timeline({
         duration <= 0 ||
         step.status !== "approved" ||
         !previewMode ||
-        step.type === "caption"
+        step.type === "caption" ||
+        step.type === "broll"
       )
         return null;
       const left = (step.startTime / duration) * 100;
@@ -493,6 +500,37 @@ export function Timeline({
               </span>
             </div>
           )}
+          {hasBroll && (
+            <div
+              className="flex items-center justify-end gap-1.5"
+              style={{
+                height: 32,
+                paddingRight: 12,
+                borderRight: "1px solid var(--panel-border)",
+                borderTop: "1px solid var(--panel-border-subtle)",
+              }}
+            >
+              <Clapperboard
+                size={10}
+                strokeWidth={1.5}
+                style={{
+                  color: "var(--text-muted)",
+                  opacity: 0.6,
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  color: "var(--text-muted)",
+                  fontWeight: 500,
+                  letterSpacing: "0.02em",
+                }}
+              >
+                B-roll
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Scrollable tracks content */}
@@ -668,6 +706,77 @@ export function Timeline({
                             }}
                           >
                             {chunk.text}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* B-roll track */}
+            {hasBroll && (
+              <div
+                style={{
+                  height: 32,
+                  borderTop: "1px solid var(--panel-border-subtle)",
+                }}
+              >
+                <div
+                  className="relative cursor-pointer h-full"
+                  style={{ padding: "3px 0" }}
+                  onMouseDown={handleTimelineMouseDown}
+                >
+                  <div
+                    className="relative h-full overflow-hidden"
+                    style={{
+                      borderRadius: 6,
+                      background: "rgba(255,255,255,.02)",
+                    }}
+                  >
+                    {brollSteps.map((step) => {
+                      if (duration <= 0) return null;
+                      const left = (step.startTime / duration) * 100;
+                      const width =
+                        ((step.endTime - step.startTime) / duration) * 100;
+                      const isApproved = step.status === "approved";
+                      return (
+                        <div
+                          key={`broll-${step.id}`}
+                          className="absolute top-0 bottom-0"
+                          style={{
+                            left: `${left}%`,
+                            width: `${width}%`,
+                            minWidth: 2,
+                            background: isApproved
+                              ? "rgba(99,179,237,.18)"
+                              : "rgba(255,255,255,.06)",
+                            border: isApproved
+                              ? "1px solid rgba(99,179,237,.4)"
+                              : "1px solid rgba(255,255,255,.08)",
+                            borderRadius: 5,
+                            display: "flex",
+                            alignItems: "center",
+                            overflow: "hidden",
+                            padding: "0 4px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: "var(--font-mono)",
+                              fontSize: 8,
+                              color: isApproved
+                                ? "rgba(99,179,237,.9)"
+                                : "var(--text-muted)",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              lineHeight: 1,
+                              opacity: 0.85,
+                            }}
+                          >
+                            {step.query ?? "B-roll"}
                           </span>
                         </div>
                       );

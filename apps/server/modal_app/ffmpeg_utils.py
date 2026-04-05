@@ -5,6 +5,8 @@ import os
 import shutil
 import tempfile
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 
@@ -415,3 +417,123 @@ def _render_keep_segments(
         pass
 
     return output_path
+
+
+# ---------------------------------------------------------------------------
+# B-roll splice helper
+# ---------------------------------------------------------------------------
+
+def splice_broll_clip(
+    source: str,
+    clip_path: str,
+    start: float,
+    end: float,
+    output: str,
+    work_dir: str,
+) -> str:
+    """Replace a segment of *source* [start, end] with *clip_path*.
+
+    1. Extract [0, start] from source  → before segment
+    2. Trim + scale clip to (end-start) and match source resolution → broll segment
+    3. Extract [end, duration] from source → after segment
+    4. Concat [before, broll, after] via the concat demuxer.
+
+    Parameters
+    ----------
+    source : str
+        Path to the source video.
+    clip_path : str
+        Path to the downloaded B-roll clip.
+    start : float
+        Splice start time in source.
+    end : float
+        Splice end time in source.
+    output : str
+        Output path for the spliced video.
+    work_dir : str
+        Temporary directory for intermediate files.
+    """
+    probe = ffmpeg.probe(source)
+    duration = float(probe["format"]["duration"])
+    video_stream = next(
+        (s for s in probe["streams"] if s["codec_type"] == "video"), None
+    )
+    src_width = int(video_stream["width"]) if video_stream else 1920
+    src_height = int(video_stream["height"]) if video_stream else 1080
+
+    broll_dur = end - start
+    segments: list[str] = []
+
+    # Before segment
+    if start > 0.05:
+        before_path = os.path.join(work_dir, "_broll_before.mp4")
+        seg = ffmpeg.input(source, ss=0)
+        v = seg.video.filter("trim", start=0, end=start).filter("setpts", "PTS-STARTPTS")
+        a = seg.audio.filter("atrim", start=0, end=start).filter("asetpts", "PTS-STARTPTS")
+        ffmpeg.output(v, a, before_path).overwrite_output().run(quiet=True)
+        segments.append(before_path)
+
+    # B-roll segment: trim to duration, scale/pad to match source resolution
+    broll_prepared = os.path.join(work_dir, "_broll_prepared.mp4")
+    clip_in = ffmpeg.input(clip_path)
+    v_broll = (
+        clip_in.video
+        .filter("trim", start=0, end=broll_dur)
+        .filter("setpts", "PTS-STARTPTS")
+        .filter("scale", src_width, src_height, force_original_aspect_ratio="decrease")
+        .filter("pad", src_width, src_height, "(ow-iw)/2", "(oh-ih)/2")
+    )
+    # Generate silent audio to match the broll duration (source audio is replaced)
+    a_broll = ffmpeg.input(
+        "anullsrc", f="lavfi", t=broll_dur,
+        **{"channel_layout": "stereo", "sample_rate": "44100"}
+    ).audio
+    ffmpeg.output(v_broll, a_broll, broll_prepared).overwrite_output().run(quiet=True)
+    segments.append(broll_prepared)
+
+    # After segment
+    if end < duration - 0.05:
+        after_path = os.path.join(work_dir, "_broll_after.mp4")
+        seg = ffmpeg.input(source, ss=end)
+        v = seg.video.filter("trim", start=end, end=duration).filter("setpts", "PTS-STARTPTS")
+        a = seg.audio.filter("atrim", start=end, end=duration).filter("asetpts", "PTS-STARTPTS")
+        ffmpeg.output(v, a, after_path).overwrite_output().run(quiet=True)
+        segments.append(after_path)
+
+    if len(segments) == 1:
+        shutil.copy2(segments[0], output)
+        return output
+
+    # Concat all segments
+    list_file = os.path.join(work_dir, "_broll_concat.txt")
+    with open(list_file, "w") as f:
+        for p in segments:
+            safe = p.replace("'", "'\\''")
+            f.write(f"file '{safe}'\n")
+
+    ffmpeg.input(list_file, format="concat", safe=0).output(
+        output, c="copy"
+    ).overwrite_output().run(quiet=True)
+
+    # Cleanup
+    for p in segments:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+    try:
+        os.remove(list_file)
+    except OSError:
+        pass
+
+    return output
+
+
+def download_broll_clip(url: str, dest: str) -> str:
+    """Download a B-roll clip from a URL to *dest*."""
+    with httpx.Client(timeout=60, follow_redirects=True) as client:
+        resp = client.get(url)
+        resp.raise_for_status()
+        with open(dest, "wb") as f:
+            f.write(resp.content)
+    return dest

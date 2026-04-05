@@ -52,6 +52,9 @@ class EditIntent:
     want_captions: bool = False
     """Burn captions / subtitles onto the exported video."""
 
+    want_broll: bool = False
+    """Insert B-roll stock footage at detected moments."""
+
     is_vague: bool = False
     """Prompt gave no recognisable instruction — all cut features on."""
 
@@ -86,6 +89,7 @@ def intents_to_edit_intent(
     want_silence = "silence_removal" in intent_set
     want_filler = "filler_removal" in intent_set
     want_captions = "captions" in intent_set
+    want_broll = "broll" in intent_set
     # Pacing follows silence: if silence removal is on, so is pacing
     want_pacing = want_silence
 
@@ -94,6 +98,7 @@ def intents_to_edit_intent(
         want_filler_cuts=want_filler,
         want_pacing=want_pacing,
         want_captions=want_captions,
+        want_broll=want_broll,
         is_vague=False,
         raw_prompt=raw_prompt,
         router_message=router_message,
@@ -142,6 +147,10 @@ _CAPTION_KW = {
     "burn subtitles", "burn captions", "add text",
     "closed caption", "closed captions", "cc",
 }
+_BROLL_KW = {
+    "b-roll", "broll", "b roll", "stock footage", "stock video",
+    "visuals", "make it look good", "improve", "cinematic",
+}
 _ONLY_MARKERS = {
     "only", "just", "solely", "nothing else",
     "don't cut", "do not cut", "without cutting", "no cuts",
@@ -157,6 +166,7 @@ def _keyword_fallback(prompt: str) -> EditIntent:
     has_silence = _any_match(text, words, _SILENCE_KW)
     has_filler = _any_match(text, words, _FILLER_KW)
     has_captions = _any_match(text, words, _CAPTION_KW)
+    has_broll = _any_match(text, words, _BROLL_KW)
     has_only = _any_match(text, words, _ONLY_MARKERS)
 
     # "only captions / just subtitles" → no cuts
@@ -166,11 +176,12 @@ def _keyword_fallback(prompt: str) -> EditIntent:
             want_filler_cuts=False,
             want_pacing=False,
             want_captions=True,
+            want_broll=False,
             is_vague=False,
             raw_prompt=prompt,
         )
 
-    any_specific = has_silence or has_filler or has_captions
+    any_specific = has_silence or has_filler or has_captions or has_broll
     if not any_specific:
         # Vague prompt — run everything
         return EditIntent(
@@ -178,6 +189,7 @@ def _keyword_fallback(prompt: str) -> EditIntent:
             want_filler_cuts=True,
             want_pacing=True,
             want_captions=False,
+            want_broll=False,
             is_vague=True,
             raw_prompt=prompt,
         )
@@ -187,6 +199,7 @@ def _keyword_fallback(prompt: str) -> EditIntent:
         want_filler_cuts=has_filler,
         want_pacing=has_silence,
         want_captions=has_captions,
+        want_broll=has_broll,
         is_vague=False,
         raw_prompt=prompt,
     )

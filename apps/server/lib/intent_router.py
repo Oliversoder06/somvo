@@ -68,6 +68,17 @@ CAPABILITIES: list[Capability] = [
         ),
         supported=True,
     ),
+    Capability(
+        intent="broll",
+        name="B-roll insertion",
+        description=(
+            "Detects moments in the transcript where stock B-roll footage "
+            "would enhance the video, searches for matching clips, and "
+            "splices them in. Triggered by requests for b-roll, visuals, "
+            "stock footage, or general improvement prompts."
+        ),
+        supported=True,
+    ),
 
     # ── Coming soon ──────────────────────────────────────────────────────────
     Capability(

@@ -82,7 +82,7 @@ async def analysis_stream(
 
         # ── Stream each step to the frontend ────────────────────────────────
         # Caption steps use their own event type so the frontend doesn't treat
-        # them as video cuts in the timeline.
+        # them as video cuts in the timeline. B-roll steps get their own type too.
         for step in steps:
             step_dict = {
                 "id": step.id,
@@ -93,7 +93,18 @@ async def analysis_stream(
                 "confidence": step.confidence,
                 "status": "pending",
             }
-            event_type = "caption" if step.type == "caption" else "cut"
+            if step.type == "broll":
+                step_dict["query"] = step.query
+                step_dict["clipUrl"] = step.clip_url
+                step_dict["clipId"] = step.clip_id
+                step_dict["thumbnailUrl"] = step.thumbnail_url
+                step_dict["label"] = step.label
+                step_dict["alternatives"] = step.alternatives or []
+                event_type = "broll"
+            elif step.type == "caption":
+                event_type = "caption"
+            else:
+                event_type = "cut"
             yield f"data: {json.dumps({'type': event_type, 'step': step_dict})}\n\n"
 
         # ── Stream pipeline log summary ──────────────────────────────────────
@@ -125,8 +136,9 @@ async def analysis_stream(
 
         # ── Persist edit steps ───────────────────────────────────────────────
         try:
-            steps_payload = [
-                {
+            steps_payload = []
+            for s in steps:
+                step_data = {
                     "id": s.id,
                     "type": s.type,
                     "reason": s.reason,
@@ -135,8 +147,14 @@ async def analysis_stream(
                     "confidence": s.confidence,
                     "status": "pending",
                 }
-                for s in steps
-            ]
+                if s.type == "broll":
+                    step_data["query"] = s.query
+                    step_data["clipUrl"] = s.clip_url
+                    step_data["clipId"] = s.clip_id
+                    step_data["thumbnailUrl"] = s.thumbnail_url
+                    step_data["label"] = s.label
+                    step_data["alternatives"] = s.alternatives or []
+                steps_payload.append(step_data)
             supabase.table("edit_steps").upsert(
                 {
                     "project_id": project_id,

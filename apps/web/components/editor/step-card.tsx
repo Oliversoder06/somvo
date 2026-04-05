@@ -18,6 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
   split: "SPLIT",
   trim: "TRIM",
   caption: "CAPTION",
+  broll: "B-ROLL",
 };
 
 export function StepCard({
@@ -126,9 +127,32 @@ export function StepCard({
             color: "var(--text-muted)",
           }}
         >
-          {formatTimestamp(step.startTime)} &ndash;{" "}
-          {formatTimestamp(step.endTime)}
+          {step.type === "broll" && step.label
+            ? step.label
+            : `${formatTimestamp(step.startTime)} \u2013 ${formatTimestamp(step.endTime)}`}
         </div>
+        {step.type === "broll" && step.thumbnailUrl && (
+          <div
+            style={{
+              marginTop: 6,
+              borderRadius: 6,
+              overflow: "hidden",
+              border: "1px solid rgba(255,255,255,.06)",
+              lineHeight: 0,
+            }}
+          >
+            <img
+              src={step.thumbnailUrl}
+              alt={step.query ?? "B-roll preview"}
+              style={{
+                width: "100%",
+                height: 56,
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          </div>
+        )}
         {step.reason && (
           <div
             style={{

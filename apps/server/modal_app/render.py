@@ -35,7 +35,9 @@ def run_render(
         apply_watermark,
         cap_resolution,
         concat_segments,
+        download_broll_clip,
         execute_edit_steps,
+        splice_broll_clip,
     )
 
     supabase = get_supabase()
@@ -106,6 +108,36 @@ def run_render(
                 pass
 
         # ── Burn captions ─────────────────────────────────────────────
+        # ── Splice B-roll clips ───────────────────────────────────────
+        broll_steps = [
+            s for s in approved_steps
+            if s["type"] == "broll" and s.get("clip_url")
+        ]
+        if broll_steps:
+            # Sort by start_time descending so splice offsets don't shift
+            broll_steps_sorted = sorted(
+                broll_steps, key=lambda s: s["start_time"], reverse=True
+            )
+            for i, bs in enumerate(broll_steps_sorted):
+                clip_dest = os.path.join(work_dir, f"broll_clip_{i}.mp4")
+                try:
+                    download_broll_clip(bs["clip_url"], clip_dest)
+                    spliced = os.path.join(work_dir, f"broll_spliced_{i}.mp4")
+                    splice_broll_clip(
+                        current_path,
+                        clip_dest,
+                        bs["start_time"],
+                        bs["end_time"],
+                        spliced,
+                        work_dir,
+                    )
+                    current_path = spliced
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to splice B-roll clip %s: %s",
+                        bs.get("clip_id"), exc,
+                    )
+
         caption_steps = [s for s in approved_steps if s["type"] == "caption"]
         if caption_steps:
             transcript_result = supabase.table("transcripts").select("words, srt").eq(

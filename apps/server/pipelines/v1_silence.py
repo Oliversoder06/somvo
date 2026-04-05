@@ -18,11 +18,15 @@ Examples
 
 from __future__ import annotations
 
+import uuid
 from typing import Any, AsyncGenerator
 
+from lib.broll_detection import detect_broll_moments
 from lib.cut_list import generate_cut_list
 from lib.intent import parse_intent
+from lib.pexels import search_videos
 from lib.silence_detection import detect_silence_combined
+from lib.step_types import EditStep
 from lib.transcribe_openai import transcribe_video
 from pipelines.base import BasePipeline
 
@@ -82,7 +86,7 @@ class SilencePipeline(BasePipeline):
             audio_silences=audio_silences,
         )
 
-        cut_count = sum(1 for s in steps if s.type != "caption")
+        cut_count = sum(1 for s in steps if s.type not in ("caption", "broll"))
         caption_count = sum(1 for s in steps if s.type == "caption")
 
         parts = []
@@ -92,6 +96,46 @@ class SilencePipeline(BasePipeline):
             parts.append("captions")
         summary = ", ".join(parts) if parts else "nothing to change"
         yield {"type": "status", "message": f"Proposing: {summary}"}
+
+        # ── 5. B-roll detection & search ──────────────────────────────────
+        if intent.want_broll:
+            yield {"type": "status", "message": "Detecting B-roll moments..."}
+            moments = await detect_broll_moments(transcript["words"], intent)
+
+            if moments:
+                yield {
+                    "type": "status",
+                    "message": f"Found {len(moments)} B-roll moments, searching clips...",
+                }
+
+                for moment in moments:
+                    results = await search_videos(moment["query"], per_page=3)
+                    if results:
+                        best = results[0]
+                        broll_step = EditStep(
+                            id=str(uuid.uuid4()),
+                            type="broll",
+                            start_time=moment["start"],
+                            end_time=moment["end"],
+                            query=moment["query"],
+                            clip_url=best["clip_url"],
+                            clip_id=best["clip_id"],
+                            thumbnail_url=best["thumbnail_url"],
+                            confidence=moment["confidence"],
+                            label=f'B-roll: "{moment["query"]}"',
+                            reason=moment["reason"],
+                            alternatives=results[1:] if len(results) > 1 else [],
+                        )
+                        steps.append(broll_step)
+
+                broll_count = sum(1 for s in steps if s.type == "broll")
+                if broll_count:
+                    yield {
+                        "type": "status",
+                        "message": f"Proposing {broll_count} B-roll insertions",
+                    }
+            else:
+                yield {"type": "status", "message": "No suitable B-roll moments found"}
 
         yield {
             "type": "result",
@@ -116,6 +160,8 @@ def _intent_status(intent) -> str:
         parts.append("pacing")
     if intent.want_captions:
         parts.append("captions")
+    if intent.want_broll:
+        parts.append("B-roll")
 
     label = ", ".join(parts) if parts else "full edit"
     prefix = "Running" if not intent.is_vague else "Running full edit"

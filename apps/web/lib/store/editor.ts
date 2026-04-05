@@ -4,12 +4,19 @@ export type StepStatus = "pending" | "approved" | "rejected";
 
 export type EditStep = {
   id: string;
-  type: "cut_silence" | "cut_filler" | "shorten" | "split" | "trim" | "caption";
+  type: "cut_silence" | "cut_filler" | "shorten" | "split" | "trim" | "caption" | "broll";
   reason: string;
   startTime: number;
   endTime: number;
   confidence?: number;
   status: StepStatus;
+  // B-roll specific fields
+  query?: string;
+  clipUrl?: string;
+  clipId?: number;
+  thumbnailUrl?: string;
+  label?: string;
+  alternatives?: Array<Record<string, unknown>>;
 };
 
 export type AgentState = "idle" | "streaming" | "done" | "failed";
