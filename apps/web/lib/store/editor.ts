@@ -4,7 +4,14 @@ export type StepStatus = "pending" | "approved" | "rejected";
 
 export type EditStep = {
   id: string;
-  type: "cut_silence" | "cut_filler" | "shorten" | "split" | "trim" | "caption" | "broll";
+  type:
+    | "cut_silence"
+    | "cut_filler"
+    | "shorten"
+    | "split"
+    | "trim"
+    | "caption"
+    | "broll";
   reason: string;
   startTime: number;
   endTime: number;
